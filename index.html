@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0f0f0d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Winslow's Collection Archive</title>
+<style>
+  :root{
+    --bg:#0f0f0d; --panel:#1a1a16; --panel2:#22221c; --line:#33332a;
+    --ink:#e8e4d8; --dim:#8f8a7a; --brass:#e8a33d; --brass-dk:#b87d24;
+    --red:#d9553f; --green:#8fbf6a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    min-height:100vh; padding-bottom:96px;
+  }
+  header{
+    position:sticky; top:0; z-index:5;
+    background:linear-gradient(180deg,#0f0f0d 78%,rgba(15,15,13,.92));
+    border-bottom:1px solid var(--line); padding:16px 16px 10px;
+  }
+  h1{
+    font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    font-size:17px; letter-spacing:.14em; color:var(--brass);
+    text-transform:uppercase;
+  }
+  .sub{font-size:12px; color:var(--dim); margin-top:3px; font-style:italic}
+  .stats{
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:8px 14px; margin-top:10px;
+    font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12px;
+  }
+  .stats b{color:var(--brass); font-size:15px; display:block}
+  .stats span{color:var(--dim)}
+  .toolbar{display:flex; gap:8px; padding:12px 16px 0}
+  #search{
+    flex:1; background:var(--panel); border:1px solid var(--line); color:var(--ink);
+    padding:10px 12px; border-radius:8px; font-size:15px; outline:none;
+  }
+  #search:focus{border-color:var(--brass-dk)}
+  #sort{
+    background:var(--panel); border:1px solid var(--line); color:var(--ink);
+    padding:10px; border-radius:8px; font-size:13px; outline:none;
+    flex:0 0 auto; width:auto; min-width:96px;   /* not the global width:100% — that starves #search */
+  }
+  #search{min-width:0}
+  .chips{display:flex; gap:7px; padding:12px 16px 0; overflow-x:auto; scrollbar-width:none}
+  .chips::-webkit-scrollbar{display:none}
+  .chip{
+    flex:0 0 auto; background:var(--panel); border:1px solid var(--line); color:var(--dim);
+    padding:6px 12px; border-radius:999px; font-size:12.5px; cursor:pointer; user-select:none;
+    white-space:nowrap;
+  }
+  .chip.on{background:var(--brass); border-color:var(--brass); color:#17130a; font-weight:600}
+  .chip i{font-style:normal; opacity:.7; font-size:11px; margin-left:4px}
+  main{padding:16px; display:grid; gap:12px; grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
+  .card{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:14px; display:flex; gap:12px; position:relative;
+  }
+  .card:hover{border-color:#45443a}
+  .thumb{
+    width:64px; height:64px; flex:0 0 64px; border-radius:8px; object-fit:cover;
+    background:var(--panel2); border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center;
+    font-family:ui-monospace,monospace; font-size:22px; color:var(--brass-dk);
+  }
+  .body{flex:1; min-width:0}
+  .name{font-size:15px; font-weight:650; line-height:1.25; word-break:break-word}
+  .meta{display:flex; flex-wrap:wrap; gap:6px; margin-top:7px}
+  .tag{
+    font-size:11px; padding:2px 8px; border-radius:999px;
+    background:var(--panel2); border:1px solid var(--line); color:var(--dim);
+  }
+  .tag.cat{color:var(--brass); border-color:#4a3a1c}
+  .tag.val{color:var(--green); border-color:#33452a}
+  .notes{
+    margin-top:8px; font-size:12.5px; color:var(--dim); line-height:1.45;
+    display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;
+    white-space:pre-wrap; word-break:break-word;
+  }
+  .acts{position:absolute; top:10px; right:10px; display:flex; gap:6px}
+  .acts button{
+    background:var(--panel2); border:1px solid var(--line); color:var(--dim);
+    width:28px; height:28px; border-radius:6px; cursor:pointer; font-size:13px;
+  }
+  .acts button:hover{color:var(--ink); border-color:#55544a}
+  .acts button.del:hover{color:var(--red); border-color:var(--red)}
+  .empty{
+    grid-column:1/-1; text-align:center; padding:56px 20px; color:var(--dim);
+    border:1px dashed var(--line); border-radius:12px;
+  }
+  .empty b{display:block; color:var(--brass); font-family:ui-monospace,monospace; margin-bottom:8px; letter-spacing:.1em}
+  #fab{
+    position:fixed; right:18px; bottom:18px; z-index:8;
+    width:60px; height:60px; border-radius:50%; border:none; cursor:pointer;
+    background:var(--brass); color:#17130a; font-size:30px; font-weight:700;
+    box-shadow:0 6px 22px rgba(0,0,0,.55);
+  }
+  #fab:active{transform:scale(.94)}
+  .modal{
+    position:fixed; inset:0; z-index:20; background:rgba(0,0,0,.72);
+    display:flex; align-items:flex-end; justify-content:center;
+  }
+  .modal[hidden]{display:none}
+  .sheet{
+    background:var(--panel); border:1px solid var(--line); border-bottom:none;
+    border-radius:16px 16px 0 0; width:100%; max-width:560px; max-height:92vh;
+    overflow-y:auto; padding:20px 18px 28px;
+  }
+  .sheet h2{
+    font-family:ui-monospace,monospace; font-size:14px; letter-spacing:.14em;
+    color:var(--brass); text-transform:uppercase; margin-bottom:16px;
+  }
+  label{display:block; font-size:12px; color:var(--dim); margin:12px 0 5px; text-transform:uppercase; letter-spacing:.06em}
+  input,select,textarea{
+    width:100%; background:var(--panel2); border:1px solid var(--line); color:var(--ink);
+    padding:11px 12px; border-radius:8px; font-size:15px; outline:none; font-family:inherit;
+  }
+  input:focus,textarea:focus,select:focus{border-color:var(--brass-dk)}
+  textarea{min-height:84px; resize:vertical}
+  .row{display:flex; gap:10px}
+  .row>div{flex:1}
+  .btns{display:flex; gap:10px; margin-top:20px}
+  button.big{
+    flex:1; padding:13px; border-radius:9px; border:none; cursor:pointer;
+    font-size:15px; font-weight:650;
+  }
+  .save{background:var(--brass); color:#17130a}
+  .cancel{background:var(--panel2); color:var(--dim); border:1px solid var(--line)}
+  .kill{
+    background:none; border:1px solid var(--red); color:var(--red);
+    padding:11px; border-radius:9px; cursor:pointer; font-size:14px; margin-top:14px; width:100%;
+  }
+  #photoPreview{
+    max-width:100%; max-height:180px; border-radius:8px; margin-top:8px;
+    border:1px solid var(--line); display:none;
+  }
+  .foot{
+    text-align:center; padding:26px 16px 8px; color:var(--dim); font-size:12px;
+    display:flex; gap:14px; justify-content:center; flex-wrap:wrap;
+  }
+  .foot button{
+    background:none; border:1px solid var(--line); color:var(--dim);
+    padding:7px 14px; border-radius:7px; cursor:pointer; font-size:12.5px;
+  }
+  .foot button:hover{color:var(--brass); border-color:var(--brass-dk)}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Winslow's Collection Archive</h1>
+  <p class="sub">log it before it disappears into another drawer</p>
+  <div class="stats" id="stats"></div>
+</header>
+
+<div class="toolbar">
+  <input id="search" type="search" placeholder="search the hoard…" autocomplete="off">
+  <select id="sort">
+    <option value="new">newest</option>
+    <option value="old">oldest</option>
+    <option value="name">A→Z</option>
+    <option value="value">value ↓</option>
+  </select>
+</div>
+
+<div class="chips" id="chips"></div>
+<main id="grid"></main>
+
+<div class="foot">
+  <button id="exportBtn">⬇ export backup</button>
+  <button id="importBtn">⬆ import backup</button>
+  <input type="file" id="importFile" accept="application/json,.json" hidden>
+</div>
+
+<button id="fab" title="add item">＋</button>
+
+<div class="modal" id="modal" hidden>
+  <div class="sheet">
+    <h2 id="modalTitle">Log an item</h2>
+    <form id="form">
+      <label for="f-name">Name *</label>
+      <input id="f-name" required maxlength="140" placeholder="1944 jeep first-aid kit">
+
+      <div class="row">
+        <div>
+          <label for="f-cat">Category</label>
+          <input id="f-cat" list="catList" maxlength="40" placeholder="World War II">
+          <datalist id="catList"></datalist>
+        </div>
+        <div>
+          <label for="f-qty">Qty</label>
+          <input id="f-qty" type="number" min="1" step="1" value="1">
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label for="f-cond">Condition</label>
+          <input id="f-cond" list="condList" maxlength="30" placeholder="Good">
+          <datalist id="condList">
+            <option>Poor</option><option>Fair</option><option>Good</option>
+            <option>Very Good</option><option>Excellent</option><option>Mint</option><option>Sealed</option>
+          </datalist>
+        </div>
+        <div>
+          <label for="f-date">Acquired</label>
+          <input id="f-date" type="date">
+        </div>
+      </div>
+
+      <label for="f-value">Est. value ($)</label>
+      <input id="f-value" type="number" min="0" step="0.01" placeholder="0.00">
+
+      <label for="f-notes">Notes / provenance</label>
+      <textarea id="f-notes" maxlength="2000" placeholder="where it came from, the story, the seller's suspicious wording…"></textarea>
+
+      <label for="f-photo">Photo</label>
+      <input id="f-photo" type="file" accept="image/*">
+      <img id="photoPreview" alt="">
+      <div id="photoState" style="font-size:12px;color:var(--dim);margin-top:6px"></div>
+
+      <div class="btns">
+        <button type="button" class="big cancel" id="cancelBtn">Cancel</button>
+        <button type="submit" class="big save">Save</button>
+      </div>
+      <button type="button" class="kill" id="deleteBtn" hidden>⚠ Delete this item</button>
+    </form>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+/* ---------- pure core (node-testable) ---------- */
+
+const KEY = 'winslow.collections.v1';
+const DEFAULT_CATS = ['Coins','World War II','Civil War','Pokémon','Games & Consoles','Weird Objects','Other'];
+
+function uid(){
+  return Date.now().toString(36) + Math.random().toString(36).slice(2,8);
+}
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(KEY);
+    if(raw){
+      const d = JSON.parse(raw);
+      return {
+        items: Array.isArray(d.items) ? d.items : [],
+        cats:  Array.isArray(d.cats) && d.cats.length ? d.cats : DEFAULT_CATS.slice()
+      };
+    }
+  }catch(e){ /* corrupted or unavailable storage → start clean */ }
+  return { items: [], cats: DEFAULT_CATS.slice() };
+}
+
+function normalizeItem(it){
+  return {
+    id: it.id || uid(),
+    name: String(it.name || '').slice(0,140),
+    cat: String(it.cat || 'Other').slice(0,40),
+    qty: Math.max(1, parseInt(it.qty,10) || 1),
+    cond: String(it.cond || '').slice(0,30),
+    date: String(it.date || ''),
+    value: Math.max(0, parseFloat(it.value) || 0),
+    notes: String(it.notes || '').slice(0,2000),
+    photo: typeof it.photo === 'string' && it.photo.startsWith('data:image') ? it.photo : null,
+    created: it.created || Date.now()
+  };
+}
+
+function upsertItem(state, item){
+  const norm = normalizeItem(item);
+  const i = state.items.findIndex(x => x.id === norm.id);
+  if(i >= 0) state.items[i] = norm;
+  else state.items.unshift(norm);
+  if(norm.cat && !state.cats.includes(norm.cat)) state.cats.push(norm.cat);
+  return state;
+}
+
+function removeItem(state, id){
+  state.items = state.items.filter(x => x.id !== id);
+  return state;
+}
+
+function filterItems(items, query, cat, sort){
+  let out = items.slice();
+  if(cat && cat !== 'All'){
+    out = out.filter(x => x.cat === cat);
+  }
+  const q = (query || '').trim().toLowerCase();
+  if(q){
+    out = out.filter(x =>
+      x.name.toLowerCase().includes(q) ||
+      x.cat.toLowerCase().includes(q) ||
+      x.cond.toLowerCase().includes(q) ||
+      x.notes.toLowerCase().includes(q)
+    );
+  }
+  if(sort === 'name') out.sort((a,b) => a.name.localeCompare(b.name));
+  else if(sort === 'value') out.sort((a,b) => b.value - a.value);
+  else if(sort === 'old') out.sort((a,b) => a.created - b.created);
+  else out.sort((a,b) => b.created - a.created);
+  return out;
+}
+
+function stats(state){
+  const pieces = state.items.reduce((n,x) => n + x.qty, 0);
+  const valued = state.items.filter(x => x.value > 0);
+  const total = valued.reduce((s,x) => s + x.value, 0);
+  return { entries: state.items.length, pieces, total, valued: valued.length };
+}
+
+function esc(s){
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => (
+    {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]
+  ));
+}
+
+/* ---------- browser layer ---------- */
+
+let state = loadState();
+let editingId = null;
+let pendingPhoto = null;   // dataURL staged in the form
+let activeCat = 'All';
+
+const $ = id => document.getElementById(id);
+
+function persist(){
+  try{
+    localStorage.setItem(KEY, JSON.stringify(state));
+    return true;
+  }catch(e){
+    alert("Storage is full — export a backup and delete some item photos, then import it back.");
+    return false;
+  }
+}
+
+function renderStats(){
+  const s = stats(state);
+  $('stats').innerHTML =
+    '<div><b>' + s.entries + '</b><span>entries</span></div>' +
+    '<div><b>' + s.pieces + '</b><span>total pieces</span></div>' +
+    '<div><b>$' + s.total.toLocaleString(undefined,{maximumFractionDigits:2}) + '</b><span>est. value (' + s.valued + ' valued)</span></div>' +
+    '<div><b>' + state.cats.length + '</b><span>categories</span></div>';
+}
+
+function renderChips(){
+  const counts = {};
+  state.items.forEach(x => { counts[x.cat] = (counts[x.cat]||0) + 1; });
+  const cats = ['All'].concat(state.cats.filter(c => counts[c]));
+  $('chips').innerHTML = cats.map(c => {
+    const n = c === 'All' ? state.items.length : counts[c];
+    return '<div class="chip' + (c === activeCat ? ' on' : '') + '" data-cat="' + esc(c) + '">' +
+      esc(c) + '<i>' + n + '</i></div>';
+  }).join('');
+}
+
+function renderGrid(){
+  const rows = filterItems(state.items, $('search').value, activeCat, $('sort').value);
+  const grid = $('grid');
+  if(!rows.length){
+    grid.innerHTML = '<div class="empty"><b>NOTHING LOGGED YET</b>' +
+      (state.items.length
+        ? 'No items match that filter. The hoard hides from search.'
+        : 'Hit the + button and start recording the hoard. Coins, pins, questionable purchases — all of it.') +
+      '</div>';
+    return;
+  }
+  grid.innerHTML = rows.map(x => {
+    const thumb = x.photo
+      ? '<img class="thumb" src="' + x.photo + '" alt="">'
+      : '<div class="thumb">' + esc((x.cat || '?').charAt(0).toUpperCase()) + '</div>';
+    const tags = [];
+    if(x.cat) tags.push('<span class="tag cat">' + esc(x.cat) + '</span>');
+    if(x.qty > 1) tags.push('<span class="tag">×' + x.qty + '</span>');
+    if(x.cond) tags.push('<span class="tag">' + esc(x.cond) + '</span>');
+    if(x.value > 0) tags.push('<span class="tag val">$' + x.value.toLocaleString(undefined,{maximumFractionDigits:2}) + '</span>');
+    if(x.date) tags.push('<span class="tag">' + esc(x.date) + '</span>');
+    return '<div class="card">' + thumb +
+      '<div class="body"><div class="name">' + esc(x.name) + '</div>' +
+      '<div class="meta">' + tags.join('') + '</div>' +
+      (x.notes ? '<div class="notes">' + esc(x.notes) + '</div>' : '') +
+      '</div>' +
+      '<div class="acts">' +
+        '<button data-edit="' + x.id + '" title="edit">✎</button>' +
+        '<button class="del" data-del="' + x.id+'" title="delete">✕</button>' +
+      '</div></div>';
+  }).join('');
+}
+
+function render(){
+  renderStats();
+  renderChips();
+  renderGrid();
+  $('catList').innerHTML = state.cats.map(c => '<option value="' + esc(c) + '">').join('');
+}
+
+/* ---------- photo handling ---------- */
+
+function readPhoto(file){
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const max = 900;
+        const scale = Math.min(1, max / Math.max(img.width, img.height));
+        const c = document.createElement('canvas');
+        c.width = Math.round(img.width * scale);
+        c.height = Math.round(img.height * scale);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        res(c.toDataURL('image/jpeg', 0.72));
+      };
+      img.onerror = () => rej(new Error('bad image'));
+      img.src = r.result;
+    };
+    r.onerror = () => rej(new Error('read failed'));
+    r.readAsDataURL(file);
+  });
+}
+
+/* ---------- modal ---------- */
+
+function openModal(item){
+  editingId = item ? item.id : null;
+  pendingPhoto = item ? item.photo : null;
+  $('modalTitle').textContent = item ? 'Edit item' : 'Log an item';
+  $('f-name').value = item ? item.name : '';
+  $('f-cat').value = item ? item.cat : '';
+  $('f-qty').value = item ? item.qty : 1;
+  $('f-cond').value = item ? item.cond : '';
+  $('f-date').value = item ? item.date : '';
+  $('f-value').value = item && item.value ? item.value : '';
+  $('f-notes').value = item ? item.notes : '';
+  $('f-photo').value = '';
+  updatePhotoPreview();
+  $('deleteBtn').hidden = !item;
+  $('modal').hidden = false;
+  setTimeout(() => $('f-name').focus(), 50);
+}
+
+function closeModal(){
+  $('modal').hidden = true;
+  editingId = null;
+  pendingPhoto = null;
+}
+
+function updatePhotoPreview(){
+  const img = $('photoPreview');
+  if(pendingPhoto){
+    img.src = pendingPhoto;
+    img.style.display = 'block';
+    $('photoState').textContent = 'Photo attached. Choose a new file to replace it.';
+  }else{
+    img.style.display = 'none';
+    $('photoState').textContent = '';
+  }
+}
+
+/* ---------- export / import ---------- */
+
+function exportJson(){
+  const blob = new Blob([JSON.stringify(state, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  const d = new Date().toISOString().slice(0,10);
+  a.href = URL.createObjectURL(blob);
+  a.download = 'collection-backup-' + d + '.json';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
+function importJson(file){
+  const r = new FileReader();
+  r.onload = () => {
+    try{
+      const d = JSON.parse(r.result);
+      if(!d || !Array.isArray(d.items)) throw new Error('not a backup');
+      if(!confirm('Import ' + d.items.length + ' entries? This replaces the current list.')) return;
+      state = {
+        items: d.items.map(normalizeItem),
+        cats: Array.isArray(d.cats) && d.cats.length ? d.cats : DEFAULT_CATS.slice()
+      };
+      state.items.forEach(x => { if(x.cat && !state.cats.includes(x.cat)) state.cats.push(x.cat); });
+      activeCat = 'All';
+      persist();
+      render();
+    }catch(e){
+      alert("That file isn't a valid backup.");
+    }
+  };
+  r.readAsText(file);
+}
+
+/* ---------- wiring ---------- */
+
+function init(){
+  $('fab').addEventListener('click', () => openModal(null));
+  $('cancelBtn').addEventListener('click', closeModal);
+  $('modal').addEventListener('click', e => { if(e.target === $('modal')) closeModal(); });
+
+  $('search').addEventListener('input', renderGrid);
+  $('sort').addEventListener('change', renderGrid);
+
+  $('chips').addEventListener('click', e => {
+    const chip = e.target.closest('.chip');
+    if(!chip) return;
+    activeCat = chip.dataset.cat;
+    renderChips();
+    renderGrid();
+  });
+
+  $('grid').addEventListener('click', e => {
+    const ed = e.target.closest('[data-edit]');
+    if(ed){
+      const it = state.items.find(x => x.id === ed.dataset.edit);
+      if(it) openModal(it);
+      return;
+    }
+    const dl = e.target.closest('[data-del]');
+    if(dl){
+      const it = state.items.find(x => x.id === dl.dataset.del);
+      if(it && confirm('Delete "' + it.name + '"? This cannot be undone.')){
+        removeItem(state, dl.dataset.del);
+        persist();
+        render();
+      }
+    }
+  });
+
+  $('f-photo').addEventListener('change', async e => {
+    const f = e.target.files && e.target.files[0];
+    if(!f) return;
+    try{
+      pendingPhoto = await readPhoto(f);
+      updatePhotoPreview();
+    }catch(err){
+      alert("Couldn't read that image — try a different file.");
+    }
+  });
+
+  $('form').addEventListener('submit', e => {
+    e.preventDefault();
+    const name = $('f-name').value.trim();
+    if(!name) return;
+    const cat = $('f-cat').value.trim() || 'Other';
+    upsertItem(state, {
+      id: editingId || uid(),
+      name,
+      cat,
+      qty: $('f-qty').value,
+      cond: $('f-cond').value.trim(),
+      date: $('f-date').value,
+      value: $('f-value').value,
+      notes: $('f-notes').value,
+      photo: pendingPhoto,
+      created: editingId
+        ? (state.items.find(x => x.id === editingId) || {}).created || Date.now()
+        : Date.now()
+    });
+    persist();
+    render();
+    closeModal();
+  });
+
+  $('deleteBtn').addEventListener('click', () => {
+    if(!editingId) return;
+    const it = state.items.find(x => x.id === editingId);
+    if(it && confirm('Delete "' + it.name + '"? This cannot be undone.')){
+      removeItem(state, editingId);
+      persist();
+      render();
+      closeModal();
+    }
+  });
+
+  $('exportBtn').addEventListener('click', exportJson);
+  $('importBtn').addEventListener('click', () => $('importFile').click());
+  $('importFile').addEventListener('change', e => {
+    const f = e.target.files && e.target.files[0];
+    if(f) importJson(f);
+    e.target.value = '';
+  });
+
+  render();
+
+  // PWA: register service worker (https or localhost only)
+  if('serviceWorker' in navigator &&
+     (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')){
+    navigator.serviceWorker.register('sw.js').catch(() => { /* offline shell unavailable — app still works */ });
+  }
+}
+
+if(typeof document !== 'undefined' && typeof window !== 'undefined'){
+  document.addEventListener('DOMContentLoaded', init);
+}
+
+if(typeof module !== 'undefined' && module.exports){
+  module.exports = { uid, normalizeItem, upsertItem, removeItem, filterItems, stats, esc, DEFAULT_CATS };
+}
+</script>
+</body>
+</html>
