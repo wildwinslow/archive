@@ -154,6 +154,15 @@
     padding:7px 14px; border-radius:7px; cursor:pointer; font-size:12.5px;
   }
   .foot button:hover{color:var(--brass); border-color:var(--brass-dk)}
+  .tag.melt{color:#ffcf87; border-color:#4a3a1c; background:#241d10}
+  .spotline{font-family:ui-monospace,Menlo,Consolas,monospace; font-size:11px; color:var(--dim); margin-top:8px}
+  .spotline b{color:#ffcf87; font-weight:600}
+  .portfolio{margin:12px 16px 0; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px 14px}
+  .pf-head{display:flex; justify-content:space-between; align-items:baseline; gap:10px; flex-wrap:wrap; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12px; color:var(--dim)}
+  .pf-head b{color:var(--brass); font-size:16px}
+  .pf-delta.up{color:var(--green)} .pf-delta.down{color:var(--red)}
+  .pf-hint{font-size:12px; color:var(--dim); font-family:ui-monospace,Menlo,Consolas,monospace}
+  svg.spark{width:100%; height:56px; display:block; margin-top:8px}
 </style>
 </head>
 <body>
@@ -162,7 +171,10 @@
   <h1>Winslow's Collection Archive</h1>
   <p class="sub">log it before it disappears into another drawer</p>
   <div class="stats" id="stats"></div>
+  <div class="spotline" id="spotline"></div>
 </header>
+
+<div class="portfolio" id="portfolio"></div>
 
 <div class="toolbar">
   <input id="search" type="search" placeholder="search the hoard…" autocomplete="off">
@@ -222,6 +234,26 @@
       <label for="f-value">Est. value ($)</label>
       <input id="f-value" type="number" min="0" step="0.01" placeholder="0.00">
 
+      <label for="f-metal">Live melt value (optional)</label>
+      <div class="row">
+        <div>
+          <select id="f-metal">
+            <option value="">not metal</option>
+            <option value="silver">silver</option>
+            <option value="gold">gold</option>
+          </select>
+        </div>
+        <div id="f-presetWrap" hidden>
+          <select id="f-preset"><option value="">coin preset…</option></select>
+        </div>
+      </div>
+      <div class="row" id="f-wtWrap" hidden>
+        <div>
+          <label for="f-weight">Fine weight (troy oz of pure metal)</label>
+          <input id="f-weight" type="number" min="0" step="any" placeholder="0.0723">
+        </div>
+      </div>
+
       <label for="f-notes">Notes / provenance</label>
       <textarea id="f-notes" maxlength="2000" placeholder="where it came from, the story, the seller's suspicious wording…"></textarea>
 
@@ -246,6 +278,21 @@
 
 const KEY = 'winslow.collections.v1';
 const DEFAULT_CATS = ['Coins','World War II','Civil War','Pokémon','Games & Consoles','Weird Objects','Other'];
+const SPOT_KEY = 'winslow.spot.v1';
+
+// Fine silver content in troy oz per coin (published melt weights, approx)
+const SILVER_PRESETS = [
+  { id:'dime90',   label:'90% silver dime (pre-1965)',        oz:0.07234 },
+  { id:'qtr90',    label:'90% silver quarter',                oz:0.18084 },
+  { id:'half90',   label:'90% silver half dollar',            oz:0.36169 },
+  { id:'dollar90', label:'90% silver dollar (Morgan/Peace)',  oz:0.77344 },
+  { id:'warNi',    label:'War nickel 1942-45 (35%)',          oz:0.05626 },
+  { id:'half40',   label:'40% half dollar 1965-70',           oz:0.14790 }
+];
+
+function fmt(n){
+  return Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
 
 function uid(){
   return Date.now().toString(36) + Math.random().toString(36).slice(2,8);
@@ -258,11 +305,12 @@ function loadState(){
       const d = JSON.parse(raw);
       return {
         items: Array.isArray(d.items) ? d.items : [],
-        cats:  Array.isArray(d.cats) && d.cats.length ? d.cats : DEFAULT_CATS.slice()
+        cats:  Array.isArray(d.cats) && d.cats.length ? d.cats : DEFAULT_CATS.slice(),
+        history: Array.isArray(d.history) ? d.history.filter(p => p && typeof p.d === 'string' && typeof p.v === 'number') : []
       };
     }
   }catch(e){ /* corrupted or unavailable storage → start clean */ }
-  return { items: [], cats: DEFAULT_CATS.slice() };
+  return { items: [], cats: DEFAULT_CATS.slice(), history: [] };
 }
 
 function normalizeItem(it){
@@ -276,6 +324,8 @@ function normalizeItem(it){
     value: Math.max(0, parseFloat(it.value) || 0),
     notes: String(it.notes || '').slice(0,2000),
     photo: typeof it.photo === 'string' && it.photo.startsWith('data:image') ? it.photo : null,
+    metal: it.metal === 'silver' || it.metal === 'gold' ? it.metal : '',
+    fineWt: Math.max(0, Math.min(100000, parseFloat(it.fineWt) || 0)),
     created: it.created || Date.now()
   };
 }
@@ -315,11 +365,57 @@ function filterItems(items, query, cat, sort){
   return out;
 }
 
-function stats(state){
-  const pieces = state.items.reduce((n,x) => n + x.qty, 0);
+// Live melt: fine weight (troy oz) x qty x spot price for the metal.
+function meltValue(item, spot){
+  if(!item || !item.metal || !item.fineWt || !spot) return 0;
+  const price = item.metal === 'gold' ? spot.gold : spot.silver;
+  if(!price) return 0;
+  return (item.qty || 1) * item.fineWt * price;
+}
+
+// What this item is worth right now: appraised value or live melt, whichever is higher.
+function worth(item, spot){
+  return Math.max(item.value || 0, meltValue(item, spot));
+}
+
+function stats(state, spot){
+  const pieces = state.items.reduce((n,x) => n + qtyOf(x), 0);
   const valued = state.items.filter(x => x.value > 0);
   const total = valued.reduce((s,x) => s + x.value, 0);
-  return { entries: state.items.length, pieces, total, valued: valued.length };
+  const meltItems = state.items.filter(x => x.metal && x.fineWt > 0);
+  const melt = meltItems.reduce((s,x) => s + meltValue(x, spot), 0);
+  const portfolio = state.items.reduce((s,x) => s + worth(x, spot), 0);
+  return {
+    entries: state.items.length, pieces, total, valued: valued.length,
+    melt, meltItems: meltItems.length, portfolio
+  };
+}
+
+function qtyOf(x){ return Math.max(1, parseInt(x.qty,10) || 1); }
+
+// One snapshot per calendar day; same day overwrites (latest wins). Capped.
+function recordHistory(state, day, value){
+  if(!Array.isArray(state.history)) state.history = [];
+  const v = Math.round(value * 100) / 100;
+  const last = state.history[state.history.length - 1];
+  if(last && last.d === day) last.v = v;
+  else state.history.push({ d: day, v });
+  while(state.history.length > 400) state.history.shift();
+  return state.history;
+}
+
+// SVG polyline points for the sparkline, scaled into w x h. '' when <2 points.
+function sparkPath(history, w, h){
+  if(!Array.isArray(history) || history.length < 2) return '';
+  const vs = history.map(p => p.v);
+  const min = Math.min.apply(null, vs);
+  const max = Math.max.apply(null, vs);
+  const range = (max - min) || 1;   // flat line still renders
+  return history.map((p, i) => {
+    const x = (i / (history.length - 1)) * w;
+    const y = h - ((p.v - min) / range) * (h - 4) - 2;   // 2px breathing room
+    return (i ? 'L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1);
+  }).join(' ');
 }
 
 function esc(s){
@@ -334,6 +430,7 @@ let state = loadState();
 let editingId = null;
 let pendingPhoto = null;   // dataURL staged in the form
 let activeCat = 'All';
+let spot = null;           // { silver, gold, ts } from live fetch or cache
 
 const $ = id => document.getElementById(id);
 
@@ -348,12 +445,62 @@ function persist(){
 }
 
 function renderStats(){
-  const s = stats(state);
+  const s = stats(state, spot);
   $('stats').innerHTML =
     '<div><b>' + s.entries + '</b><span>entries</span></div>' +
     '<div><b>' + s.pieces + '</b><span>total pieces</span></div>' +
-    '<div><b>$' + s.total.toLocaleString(undefined,{maximumFractionDigits:2}) + '</b><span>est. value (' + s.valued + ' valued)</span></div>' +
+    '<div><b>$' + fmt(s.total) + '</b><span>est. value (' + s.valued + ' valued)</span></div>' +
+    (s.meltItems
+      ? '<div><b>$' + fmt(s.melt) + '</b><span>live melt (' + s.meltItems + ' metal)</span></div>'
+      : '') +
     '<div><b>' + state.cats.length + '</b><span>categories</span></div>';
+}
+
+function renderSpot(){
+  const el = $('spotline');
+  if(!spot){
+    el.innerHTML = 'spot prices unavailable — will retry when online';
+    return;
+  }
+  const t = new Date(spot.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  el.innerHTML =
+    '<b>Silver</b> $' + spot.silver.toFixed(2) + '/oz · <b>Gold</b> $' +
+    spot.gold.toLocaleString(undefined,{maximumFractionDigits:2}) + '/oz · updated ' + t;
+}
+
+function renderPortfolio(){
+  const el = $('portfolio');
+  const s = stats(state, spot);
+  const h = state.history || [];
+  if(h.length < 2){
+    el.innerHTML =
+      '<div class="pf-head"><span>portfolio</span><b>$' + fmt(s.portfolio) + '</b></div>' +
+      '<div class="pf-hint">the trend line builds one point per day you open the archive</div>';
+    return;
+  }
+  const first = h[0], last = h[h.length - 1];
+  const delta = Math.round((last.v - first.v) * 100) / 100;
+  const cls = delta > 0 ? 'up' : delta < 0 ? 'down' : '';
+  const arrow = delta > 0 ? '▲' : delta < 0 ? '▼' : '·';
+  const d1 = first.d.slice(5).replace('-', '/');
+  el.innerHTML =
+    '<div class="pf-head">' +
+      '<span>portfolio · since ' + d1 + ' <span class="pf-delta ' + cls + '">' +
+        arrow + ' $' + fmt(Math.abs(delta)) + '</span></span>' +
+      '<b>$' + fmt(last.v) + '</b>' +
+    '</div>' +
+    '<svg class="spark" viewBox="0 0 300 56" preserveAspectRatio="none" aria-hidden="true">' +
+      '<path d="' + sparkPath(h, 300, 56) + '" fill="none" stroke="#e8a33d" stroke-width="2" vector-effect="non-scaling-stroke"/>' +
+    '</svg>';
+}
+
+// Daily snapshot: record today's portfolio value, persist only if it changed.
+function snapshotToday(){
+  const s = stats(state, spot);
+  const day = new Date().toISOString().slice(0, 10);
+  const before = JSON.stringify(state.history || []);
+  recordHistory(state, day, s.portfolio);
+  if(JSON.stringify(state.history) !== before) persist();
 }
 
 function renderChips(){
@@ -386,7 +533,9 @@ function renderGrid(){
     if(x.cat) tags.push('<span class="tag cat">' + esc(x.cat) + '</span>');
     if(x.qty > 1) tags.push('<span class="tag">×' + x.qty + '</span>');
     if(x.cond) tags.push('<span class="tag">' + esc(x.cond) + '</span>');
-    if(x.value > 0) tags.push('<span class="tag val">$' + x.value.toLocaleString(undefined,{maximumFractionDigits:2}) + '</span>');
+    if(x.value > 0) tags.push('<span class="tag val">$' + fmt(x.value) + '</span>');
+    const mv = meltValue(x, spot);
+    if(mv > 0) tags.push('<span class="tag melt" title="live melt at spot">melt $' + fmt(mv) + '</span>');
     if(x.date) tags.push('<span class="tag">' + esc(x.date) + '</span>');
     return '<div class="card">' + thumb +
       '<div class="body"><div class="name">' + esc(x.name) + '</div>' +
@@ -402,9 +551,52 @@ function renderGrid(){
 
 function render(){
   renderStats();
+  renderSpot();
+  renderPortfolio();
   renderChips();
   renderGrid();
   $('catList').innerHTML = state.cats.map(c => '<option value="' + esc(c) + '">').join('');
+  snapshotToday();
+}
+
+/* ---------- metal / melt UI ---------- */
+
+function updateMetalUI(){
+  const m = $('f-metal').value;
+  $('f-presetWrap').hidden = m !== 'silver';
+  $('f-wtWrap').hidden = !m;
+  if(!m){
+    $('f-weight').value = '';
+    $('f-preset').value = '';
+  }
+}
+
+/* ---------- spot prices ---------- */
+
+async function loadSpot(){
+  // instant paint from cache while the network fetch runs
+  try{
+    const cached = JSON.parse(localStorage.getItem(SPOT_KEY) || 'null');
+    if(cached && cached.silver && cached.gold){
+      spot = cached;
+      renderSpot();
+      renderPortfolio();
+      renderStats();
+      renderGrid();
+    }
+  }catch(e){ /* no usable cache */ }
+  try{
+    const [ag, au] = await Promise.all([
+      fetch('https://api.gold-api.com/price/XAG').then(r => { if(!r.ok) throw new Error('ag'); return r.json(); }),
+      fetch('https://api.gold-api.com/price/XAU').then(r => { if(!r.ok) throw new Error('au'); return r.json(); })
+    ]);
+    if(!ag.price || !au.price) throw new Error('bad price');
+    spot = { silver: ag.price, gold: au.price, ts: Date.now() };
+    try{ localStorage.setItem(SPOT_KEY, JSON.stringify(spot)); }catch(e){ /* quota — spot still works this session */ }
+    render();
+  }catch(e){
+    // offline / API down: cached spot (or none) already rendered — nothing to do
+  }
 }
 
 /* ---------- photo handling ---------- */
@@ -443,6 +635,13 @@ function openModal(item){
   $('f-cond').value = item ? item.cond : '';
   $('f-date').value = item ? item.date : '';
   $('f-value').value = item && item.value ? item.value : '';
+  $('f-metal').value = item ? (item.metal || '') : '';
+  $('f-weight').value = item && item.fineWt ? item.fineWt : '';
+  const match = item && item.metal === 'silver'
+    ? SILVER_PRESETS.find(p => Math.abs(p.oz - (item.fineWt || 0)) < 1e-6)
+    : null;
+  $('f-preset').value = match ? match.id : '';
+  updateMetalUI();
   $('f-notes').value = item ? item.notes : '';
   $('f-photo').value = '';
   updatePhotoPreview();
@@ -492,7 +691,10 @@ function importJson(file){
       if(!confirm('Import ' + d.items.length + ' entries? This replaces the current list.')) return;
       state = {
         items: d.items.map(normalizeItem),
-        cats: Array.isArray(d.cats) && d.cats.length ? d.cats : DEFAULT_CATS.slice()
+        cats: Array.isArray(d.cats) && d.cats.length ? d.cats : DEFAULT_CATS.slice(),
+        history: Array.isArray(d.history)
+          ? d.history.filter(p => p && typeof p.d === 'string' && typeof p.v === 'number')
+          : []
       };
       state.items.forEach(x => { if(x.cat && !state.cats.includes(x.cat)) state.cats.push(x.cat); });
       activeCat = 'All';
@@ -565,6 +767,8 @@ function init(){
       cond: $('f-cond').value.trim(),
       date: $('f-date').value,
       value: $('f-value').value,
+      metal: $('f-metal').value,
+      fineWt: $('f-weight').value,
       notes: $('f-notes').value,
       photo: pendingPhoto,
       created: editingId
@@ -595,7 +799,18 @@ function init(){
     e.target.value = '';
   });
 
+  // metal/melt controls
+  $('f-preset').innerHTML = '<option value="">coin preset…</option>' +
+    SILVER_PRESETS.map(p => '<option value="' + p.id + '">' + esc(p.label) + ' · ' + p.oz + ' oz</option>').join('');
+  $('f-metal').addEventListener('change', updateMetalUI);
+  $('f-preset').addEventListener('change', () => {
+    const p = SILVER_PRESETS.find(x => x.id === $('f-preset').value);
+    if(p) $('f-weight').value = p.oz;
+  });
+  $('f-weight').addEventListener('input', () => { $('f-preset').value = ''; });  // manual edit overrides preset
+
   render();
+  loadSpot();   // async: repaints with live silver/gold when it lands
 
   // PWA: register service worker (https or localhost only)
   if('serviceWorker' in navigator &&
@@ -609,7 +824,10 @@ if(typeof document !== 'undefined' && typeof window !== 'undefined'){
 }
 
 if(typeof module !== 'undefined' && module.exports){
-  module.exports = { uid, normalizeItem, upsertItem, removeItem, filterItems, stats, esc, DEFAULT_CATS };
+  module.exports = {
+    uid, normalizeItem, upsertItem, removeItem, filterItems, stats, esc, DEFAULT_CATS,
+    meltValue, worth, recordHistory, sparkPath, SILVER_PRESETS, fmt, qtyOf
+  };
 }
 </script>
 </body>
