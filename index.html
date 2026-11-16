@@ -192,8 +192,11 @@
 <div class="foot">
   <button id="exportBtn">⬇ export backup</button>
   <button id="importBtn">⬆ import backup</button>
+  <button id="mergeBtn">➕ merge file</button>
   <input type="file" id="importFile" accept="application/json,.json" hidden>
+  <input type="file" id="mergeFile" accept="application/json,.json" hidden>
 </div>
+<div class="foot" id="mergeStatus" style="min-height:18px"></div>
 
 <button id="fab" title="add item">＋</button>
 
@@ -313,6 +316,33 @@ function loadState(){
   return { items: [], cats: DEFAULT_CATS.slice(), history: [] };
 }
 
+// Merge incoming entries into local list by id.
+// New id -> add. Same id -> newer 'updated' wins; older/equal -> local kept.
+function mergeItems(local, incoming){
+  let added = 0, updated = 0, skipped = 0;
+  const byId = new Map(local.map(x => [x.id, x]));
+  for(const raw of (incoming || [])){
+    const norm = normalizeItem(raw);
+    const cur = byId.get(norm.id);
+    if(!cur){
+      local.push(norm);
+      byId.set(norm.id, norm);
+      added++;
+      continue;
+    }
+    const curT = cur.updated || cur.created || 0;
+    const newT = norm.updated || norm.created || 0;
+    if(newT > curT){
+      const i = local.indexOf(cur);
+      local[i] = norm;
+      updated++;
+    }else{
+      skipped++;
+    }
+  }
+  return { added, updated, skipped };
+}
+
 function normalizeItem(it){
   return {
     id: it.id || uid(),
@@ -326,7 +356,8 @@ function normalizeItem(it){
     photo: typeof it.photo === 'string' && it.photo.startsWith('data:image') ? it.photo : null,
     metal: it.metal === 'silver' || it.metal === 'gold' ? it.metal : '',
     fineWt: Math.max(0, Math.min(100000, parseFloat(it.fineWt) || 0)),
-    created: it.created || Date.now()
+    created: it.created || Date.now(),
+    updated: Number(it.updated) || Number(it.created) || Date.now()
   };
 }
 
@@ -707,6 +738,28 @@ function importJson(file){
   r.readAsText(file);
 }
 
+// Merge a Rook-generated entry file: adds new ids, updates newer ones, keeps local otherwise.
+function mergeJson(file){
+  const r = new FileReader();
+  r.onload = () => {
+    try{
+      const d = JSON.parse(r.result);
+      if(!d || !Array.isArray(d.items)) throw new Error('not an entry file');
+      const res = mergeItems(state.items, d.items);
+      if(Array.isArray(d.cats)){
+        d.cats.forEach(c => { if(c && !state.cats.includes(c)) state.cats.push(c); });
+      }
+      persist();
+      render();
+      $('mergeStatus').textContent =
+        'merged: ' + res.added + ' added · ' + res.updated + ' updated · ' + res.skipped + ' kept yours';
+    }catch(e){
+      $('mergeStatus').textContent = "that file isn't a valid entry file";
+    }
+  };
+  r.readAsText(file);
+}
+
 /* ---------- wiring ---------- */
 
 function init(){
@@ -773,7 +826,8 @@ function init(){
       photo: pendingPhoto,
       created: editingId
         ? (state.items.find(x => x.id === editingId) || {}).created || Date.now()
-        : Date.now()
+        : Date.now(),
+      updated: Date.now()
     });
     persist();
     render();
@@ -793,6 +847,12 @@ function init(){
 
   $('exportBtn').addEventListener('click', exportJson);
   $('importBtn').addEventListener('click', () => $('importFile').click());
+  $('mergeBtn').addEventListener('click', () => $('mergeFile').click());
+  $('mergeFile').addEventListener('change', e => {
+    const f = e.target.files && e.target.files[0];
+    if(f) mergeJson(f);
+    e.target.value = '';
+  });
   $('importFile').addEventListener('change', e => {
     const f = e.target.files && e.target.files[0];
     if(f) importJson(f);
@@ -826,7 +886,7 @@ if(typeof document !== 'undefined' && typeof window !== 'undefined'){
 if(typeof module !== 'undefined' && module.exports){
   module.exports = {
     uid, normalizeItem, upsertItem, removeItem, filterItems, stats, esc, DEFAULT_CATS,
-    meltValue, worth, recordHistory, sparkPath, SILVER_PRESETS, fmt, qtyOf
+    meltValue, worth, recordHistory, sparkPath, SILVER_PRESETS, fmt, qtyOf, mergeItems
   };
 }
 </script>

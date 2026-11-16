@@ -1,6 +1,6 @@
 /* Service worker — offline shell for the Collection Archive.
    Bump CACHE on every deploy of the shell files. */
-const CACHE = 'archive-v3';
+const CACHE = 'archive-v4';
 const SHELL = [
   './',
   './index.html',
