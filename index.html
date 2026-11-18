@@ -155,6 +155,14 @@
   }
   .foot button:hover{color:var(--brass); border-color:var(--brass-dk)}
   .tag.melt{color:#ffcf87; border-color:#4a3a1c; background:#241d10}
+  .tag.year{color:#b79cff; border-color:#3a2f55}
+  .viewbar{display:flex; gap:8px; padding:12px 16px 0}
+  .viewbtn{
+    flex:1; background:var(--panel); border:1px solid var(--line); color:var(--dim);
+    padding:9px 10px; border-radius:999px; font-size:13px; cursor:pointer; user-select:none;
+    font-family:ui-monospace,Menlo,Consolas,monospace; letter-spacing:.04em;
+  }
+  .viewbtn.on{background:var(--brass); border-color:var(--brass); color:#17130a; font-weight:700}
   .spotline{font-family:ui-monospace,Menlo,Consolas,monospace; font-size:11px; color:var(--dim); margin-top:8px}
   .spotline b{color:#ffcf87; font-weight:600}
   .portfolio{margin:12px 16px 0; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px 14px}
@@ -183,7 +191,14 @@
     <option value="old">oldest</option>
     <option value="name">A→Z</option>
     <option value="value">value ↓</option>
+    <option value="year-asc">year ↑</option>
+    <option value="year-desc">year ↓</option>
   </select>
+</div>
+
+<div class="viewbar">
+  <button class="viewbtn on" id="viewCollection">📦 collection</button>
+  <button class="viewbtn" id="viewWishlist">🎯 wishlist</button>
 </div>
 
 <div class="chips" id="chips"></div>
@@ -213,13 +228,13 @@
           <input id="f-cat" list="catList" maxlength="40" placeholder="World War II">
           <datalist id="catList"></datalist>
         </div>
-        <div>
+        <div id="qtyWrap">
           <label for="f-qty">Qty</label>
           <input id="f-qty" type="number" min="1" step="1" value="1">
         </div>
       </div>
 
-      <div class="row">
+      <div class="row" id="condDateRow">
         <div>
           <label for="f-cond">Condition</label>
           <input id="f-cond" list="condList" maxlength="30" placeholder="Good">
@@ -234,9 +249,13 @@
         </div>
       </div>
 
-      <label for="f-value">Est. value ($)</label>
+      <label for="f-year">Year / release date</label>
+      <input id="f-year" maxlength="24" placeholder="1920 or 1915-1925" autocomplete="off">
+
+      <label for="f-value" id="valueLabel">Est. value ($)</label>
       <input id="f-value" type="number" min="0" step="0.01" placeholder="0.00">
 
+      <div id="meltWrap">
       <label for="f-metal">Live melt value (optional)</label>
       <div class="row">
         <div>
@@ -255,6 +274,7 @@
           <label for="f-weight">Fine weight (troy oz of pure metal)</label>
           <input id="f-weight" type="number" min="0" step="any" placeholder="0.0723">
         </div>
+      </div>
       </div>
 
       <label for="f-notes">Notes / provenance</label>
@@ -308,12 +328,13 @@ function loadState(){
       const d = JSON.parse(raw);
       return {
         items: Array.isArray(d.items) ? d.items : [],
+        wishlist: Array.isArray(d.wishlist) ? d.wishlist : [],
         cats:  Array.isArray(d.cats) && d.cats.length ? d.cats : DEFAULT_CATS.slice(),
         history: Array.isArray(d.history) ? d.history.filter(p => p && typeof p.d === 'string' && typeof p.v === 'number') : []
       };
     }
   }catch(e){ /* corrupted or unavailable storage → start clean */ }
-  return { items: [], cats: DEFAULT_CATS.slice(), history: [] };
+  return { items: [], wishlist: [], cats: DEFAULT_CATS.slice(), history: [] };
 }
 
 // Merge incoming entries into local list by id.
@@ -343,6 +364,31 @@ function mergeItems(local, incoming){
   return { added, updated, skipped };
 }
 
+// Year handling: a single year ("1920") or a range ("1915-1925") for when the
+// exact date isn't pinned down. 0 = unknown.
+function normYear(v){
+  const n = parseInt(v, 10);
+  return (n >= 1000 && n <= 2100) ? n : 0;
+}
+function fixYearTo(to, from){
+  const f = normYear(from);
+  if(!f) return 0;
+  const t = normYear(to);
+  return (t && t >= f) ? t : f;
+}
+function parseYearRange(str){
+  const m = String(str || '').trim().match(/^(\d{3,4})(?:\s*[-\u2013\u2014]\s*(\d{3,4}))?$/);
+  if(!m) return { from: 0, to: 0 };
+  let a = parseInt(m[1], 10), b = m[2] ? parseInt(m[2], 10) : a;
+  if(a > b){ const t = a; a = b; b = t; }
+  if(a < 1000 || b > 2100) return { from: 0, to: 0 };
+  return { from: a, to: b };
+}
+function yearLabel(x){
+  if(!x || !x.yearFrom) return '';
+  return (x.yearTo && x.yearTo !== x.yearFrom) ? (x.yearFrom + '\u2013' + x.yearTo) : String(x.yearFrom);
+}
+
 function normalizeItem(it){
   return {
     id: it.id || uid(),
@@ -356,22 +402,27 @@ function normalizeItem(it){
     photo: typeof it.photo === 'string' && it.photo.startsWith('data:image') ? it.photo : null,
     metal: it.metal === 'silver' || it.metal === 'gold' ? it.metal : '',
     fineWt: Math.max(0, Math.min(100000, parseFloat(it.fineWt) || 0)),
+    yearFrom: normYear(it.yearFrom),
+    yearTo: fixYearTo(it.yearTo, it.yearFrom),
     created: it.created || Date.now(),
     updated: Number(it.updated) || Number(it.created) || Date.now()
   };
 }
 
-function upsertItem(state, item){
+function upsertItem(state, item, list){
+  const key = list === 'wishlist' ? 'wishlist' : 'items';
+  if(!Array.isArray(state[key])) state[key] = [];
   const norm = normalizeItem(item);
-  const i = state.items.findIndex(x => x.id === norm.id);
-  if(i >= 0) state.items[i] = norm;
-  else state.items.unshift(norm);
+  const i = state[key].findIndex(x => x.id === norm.id);
+  if(i >= 0) state[key][i] = norm;
+  else state[key].unshift(norm);
   if(norm.cat && !state.cats.includes(norm.cat)) state.cats.push(norm.cat);
   return state;
 }
 
-function removeItem(state, id){
-  state.items = state.items.filter(x => x.id !== id);
+function removeItem(state, id, list){
+  const key = list === 'wishlist' ? 'wishlist' : 'items';
+  state[key] = (state[key] || []).filter(x => x.id !== id);
   return state;
 }
 
@@ -382,18 +433,38 @@ function filterItems(items, query, cat, sort){
   }
   const q = (query || '').trim().toLowerCase();
   if(q){
-    out = out.filter(x =>
-      x.name.toLowerCase().includes(q) ||
-      x.cat.toLowerCase().includes(q) ||
-      x.cond.toLowerCase().includes(q) ||
-      x.notes.toLowerCase().includes(q)
-    );
+    // "1920" or "1900-1950" also match by year overlap; everything else is text.
+    const ym = q.match(/^(\d{3,4})(?:\s*-\s*(\d{3,4}))?$/);
+    out = out.filter(x => {
+      const hay = (x.name + ' ' + x.cat + ' ' + x.cond + ' ' + x.notes + ' ' + yearLabel(x)).toLowerCase();
+      if(hay.includes(q)) return true;
+      if(ym && x.yearFrom){
+        const qa = parseInt(ym[1], 10), qb = ym[2] ? parseInt(ym[2], 10) : qa;
+        const ia = x.yearFrom, ib = x.yearTo || x.yearFrom;
+        if(ia <= qb && ib >= qa) return true;
+      }
+      return false;
+    });
   }
   if(sort === 'name') out.sort((a,b) => a.name.localeCompare(b.name));
   else if(sort === 'value') out.sort((a,b) => b.value - a.value);
+  else if(sort === 'year-asc') out.sort(cmpYearAsc);
+  else if(sort === 'year-desc') out.sort(cmpYearDesc);
   else if(sort === 'old') out.sort((a,b) => a.created - b.created);
   else out.sort((a,b) => b.created - a.created);
   return out;
+}
+
+// Items without a year always sink to the bottom, both directions.
+function cmpYearAsc(a, b){
+  if(!a.yearFrom !== !b.yearFrom) return a.yearFrom ? -1 : 1;
+  if(a.yearFrom && a.yearFrom !== b.yearFrom) return a.yearFrom - b.yearFrom;
+  return a.name.localeCompare(b.name);
+}
+function cmpYearDesc(a, b){
+  if(!a.yearFrom !== !b.yearFrom) return a.yearFrom ? -1 : 1;
+  if(a.yearFrom && a.yearFrom !== b.yearFrom) return b.yearFrom - a.yearFrom;
+  return a.name.localeCompare(b.name);
 }
 
 // Live melt: fine weight (troy oz) x qty x spot price for the metal.
@@ -459,9 +530,26 @@ function esc(s){
 
 let state = loadState();
 let editingId = null;
+let editingList = 'items'; // which array the open modal edits: 'items' | 'wishlist'
 let pendingPhoto = null;   // dataURL staged in the form
 let activeCat = 'All';
 let spot = null;           // { silver, gold, ts } from live fetch or cache
+let view = 'collection';   // 'collection' | 'wishlist'
+
+function activeList(){
+  if(view === 'wishlist'){
+    if(!Array.isArray(state.wishlist)) state.wishlist = [];
+    return state.wishlist;
+  }
+  return state.items;
+}
+
+function setView(v){
+  if(view === v) return;
+  view = v;
+  activeCat = 'All';
+  render();
+}
 
 const $ = id => document.getElementById(id);
 
@@ -535,24 +623,30 @@ function snapshotToday(){
 }
 
 function renderChips(){
+  const list = activeList();
   const counts = {};
-  state.items.forEach(x => { counts[x.cat] = (counts[x.cat]||0) + 1; });
+  list.forEach(x => { counts[x.cat] = (counts[x.cat]||0) + 1; });
   const cats = ['All'].concat(state.cats.filter(c => counts[c]));
   $('chips').innerHTML = cats.map(c => {
-    const n = c === 'All' ? state.items.length : counts[c];
+    const n = c === 'All' ? list.length : counts[c];
     return '<div class="chip' + (c === activeCat ? ' on' : '') + '" data-cat="' + esc(c) + '">' +
       esc(c) + '<i>' + n + '</i></div>';
   }).join('');
 }
 
 function renderGrid(){
-  const rows = filterItems(state.items, $('search').value, activeCat, $('sort').value);
+  const list = activeList();
+  const rows = filterItems(list, $('search').value, activeCat, $('sort').value);
   const grid = $('grid');
   if(!rows.length){
-    grid.innerHTML = '<div class="empty"><b>NOTHING LOGGED YET</b>' +
-      (state.items.length
+    const wish = view === 'wishlist';
+    grid.innerHTML = '<div class="empty"><b>' +
+      (wish ? 'WISHLIST EMPTY' : 'NOTHING LOGGED YET') + '</b>' +
+      (list.length
         ? 'No items match that filter. The hoard hides from search.'
-        : 'Hit the + button and start recording the hoard. Coins, pins, questionable purchases — all of it.') +
+        : (wish
+          ? 'Nothing wanted yet. The white whales are getting impatient — hit the + button.'
+          : 'Hit the + button and start recording the hoard. Coins, pins, questionable purchases — all of it.')) +
       '</div>';
     return;
   }
@@ -562,9 +656,11 @@ function renderGrid(){
       : '<div class="thumb">' + esc((x.cat || '?').charAt(0).toUpperCase()) + '</div>';
     const tags = [];
     if(x.cat) tags.push('<span class="tag cat">' + esc(x.cat) + '</span>');
+    if(x.yearFrom) tags.push('<span class="tag year">' + esc(yearLabel(x)) + '</span>');
     if(x.qty > 1) tags.push('<span class="tag">×' + x.qty + '</span>');
     if(x.cond) tags.push('<span class="tag">' + esc(x.cond) + '</span>');
-    if(x.value > 0) tags.push('<span class="tag val">$' + fmt(x.value) + '</span>');
+    if(x.value > 0) tags.push('<span class="tag val">' +
+      (view === 'wishlist' ? 'target $' : '$') + fmt(x.value) + '</span>');
     const mv = meltValue(x, spot);
     if(mv > 0) tags.push('<span class="tag melt" title="live melt at spot">melt $' + fmt(mv) + '</span>');
     if(x.date) tags.push('<span class="tag">' + esc(x.date) + '</span>');
@@ -580,7 +676,14 @@ function renderGrid(){
   }).join('');
 }
 
+function renderViewbar(){
+  $('viewCollection').classList.toggle('on', view === 'collection');
+  $('viewWishlist').classList.toggle('on', view === 'wishlist');
+  $('viewWishlist').textContent = '🎯 wishlist (' + ((state.wishlist || []).length) + ')';
+}
+
 function render(){
+  renderViewbar();
   renderStats();
   renderSpot();
   renderPortfolio();
@@ -656,10 +759,18 @@ function readPhoto(file){
 
 /* ---------- modal ---------- */
 
-function openModal(item){
+function openModal(item, mode){
+  editingList = (mode || view) === 'wishlist' ? 'wishlist' : 'items';
+  const wish = editingList === 'wishlist';
   editingId = item ? item.id : null;
   pendingPhoto = item ? item.photo : null;
-  $('modalTitle').textContent = item ? 'Edit item' : 'Log an item';
+  $('modalTitle').textContent = wish ? (item ? 'Edit want' : 'Add to wishlist')
+                                    : (item ? 'Edit item' : 'Log an item');
+  $('valueLabel').textContent = wish ? 'Target price ($)' : 'Est. value ($)';
+  $('qtyWrap').hidden = wish;
+  $('condDateRow').hidden = wish;
+  $('meltWrap').hidden = wish;
+  $('f-year').value = item ? yearLabel(item) : '';
   $('f-name').value = item ? item.name : '';
   $('f-cat').value = item ? item.cat : '';
   $('f-qty').value = item ? item.qty : 1;
@@ -722,6 +833,7 @@ function importJson(file){
       if(!confirm('Import ' + d.items.length + ' entries? This replaces the current list.')) return;
       state = {
         items: d.items.map(normalizeItem),
+        wishlist: Array.isArray(d.wishlist) ? d.wishlist.map(normalizeItem) : [],
         cats: Array.isArray(d.cats) && d.cats.length ? d.cats : DEFAULT_CATS.slice(),
         history: Array.isArray(d.history)
           ? d.history.filter(p => p && typeof p.d === 'string' && typeof p.v === 'number')
@@ -744,15 +856,20 @@ function mergeJson(file){
   r.onload = () => {
     try{
       const d = JSON.parse(r.result);
-      if(!d || !Array.isArray(d.items)) throw new Error('not an entry file');
-      const res = mergeItems(state.items, d.items);
+      if(!d || (!Array.isArray(d.items) && !Array.isArray(d.wishlist))) throw new Error('not an entry file');
+      const res = mergeItems(state.items, Array.isArray(d.items) ? d.items : []);
+      if(!Array.isArray(state.wishlist)) state.wishlist = [];
+      const rw = mergeItems(state.wishlist, Array.isArray(d.wishlist) ? d.wishlist : []);
       if(Array.isArray(d.cats)){
         d.cats.forEach(c => { if(c && !state.cats.includes(c)) state.cats.push(c); });
       }
       persist();
       render();
       $('mergeStatus').textContent =
-        'merged: ' + res.added + ' added · ' + res.updated + ' updated · ' + res.skipped + ' kept yours';
+        'merged: ' + (res.added + rw.added) + ' added · ' +
+        (res.updated + rw.updated) + ' updated · ' +
+        (res.skipped + rw.skipped) + ' kept yours' +
+        ((rw.added || rw.updated) ? ' · ' + (rw.added + rw.updated) + ' → wishlist' : '');
     }catch(e){
       $('mergeStatus').textContent = "that file isn't a valid entry file";
     }
@@ -763,7 +880,9 @@ function mergeJson(file){
 /* ---------- wiring ---------- */
 
 function init(){
-  $('fab').addEventListener('click', () => openModal(null));
+  $('fab').addEventListener('click', () => openModal(null, view));
+  $('viewCollection').addEventListener('click', () => setView('collection'));
+  $('viewWishlist').addEventListener('click', () => setView('wishlist'));
   $('cancelBtn').addEventListener('click', closeModal);
   $('modal').addEventListener('click', e => { if(e.target === $('modal')) closeModal(); });
 
@@ -781,15 +900,15 @@ function init(){
   $('grid').addEventListener('click', e => {
     const ed = e.target.closest('[data-edit]');
     if(ed){
-      const it = state.items.find(x => x.id === ed.dataset.edit);
-      if(it) openModal(it);
+      const it = activeList().find(x => x.id === ed.dataset.edit);
+      if(it) openModal(it, view);
       return;
     }
     const dl = e.target.closest('[data-del]');
     if(dl){
-      const it = state.items.find(x => x.id === dl.dataset.del);
+      const it = activeList().find(x => x.id === dl.dataset.del);
       if(it && confirm('Delete "' + it.name + '"? This cannot be undone.')){
-        removeItem(state, dl.dataset.del);
+        removeItem(state, dl.dataset.del, view);
         persist();
         render();
       }
@@ -812,6 +931,9 @@ function init(){
     const name = $('f-name').value.trim();
     if(!name) return;
     const cat = $('f-cat').value.trim() || 'Other';
+    const yr = parseYearRange($('f-year').value);
+    const list = editingList;
+    if(!Array.isArray(state[list])) state[list] = [];
     upsertItem(state, {
       id: editingId || uid(),
       name,
@@ -822,13 +944,15 @@ function init(){
       value: $('f-value').value,
       metal: $('f-metal').value,
       fineWt: $('f-weight').value,
+      yearFrom: yr.from,
+      yearTo: yr.to,
       notes: $('f-notes').value,
       photo: pendingPhoto,
       created: editingId
-        ? (state.items.find(x => x.id === editingId) || {}).created || Date.now()
+        ? (state[list].find(x => x.id === editingId) || {}).created || Date.now()
         : Date.now(),
       updated: Date.now()
-    });
+    }, list);
     persist();
     render();
     closeModal();
@@ -836,9 +960,10 @@ function init(){
 
   $('deleteBtn').addEventListener('click', () => {
     if(!editingId) return;
-    const it = state.items.find(x => x.id === editingId);
+    const list = editingList;
+    const it = (state[list] || []).find(x => x.id === editingId);
     if(it && confirm('Delete "' + it.name + '"? This cannot be undone.')){
-      removeItem(state, editingId);
+      removeItem(state, editingId, list);
       persist();
       render();
       closeModal();
@@ -886,7 +1011,8 @@ if(typeof document !== 'undefined' && typeof window !== 'undefined'){
 if(typeof module !== 'undefined' && module.exports){
   module.exports = {
     uid, normalizeItem, upsertItem, removeItem, filterItems, stats, esc, DEFAULT_CATS,
-    meltValue, worth, recordHistory, sparkPath, SILVER_PRESETS, fmt, qtyOf, mergeItems
+    meltValue, worth, recordHistory, sparkPath, SILVER_PRESETS, fmt, qtyOf, mergeItems,
+    parseYearRange, yearLabel, normYear, cmpYearAsc, cmpYearDesc
   };
 }
 </script>
