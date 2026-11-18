@@ -252,6 +252,31 @@
       <label for="f-year">Year / release date</label>
       <input id="f-year" maxlength="24" placeholder="1920 or 1915-1925" autocomplete="off">
 
+      <div class="row">
+        <div>
+          <label for="f-country">Country of origin</label>
+          <input id="f-country" list="countryList" maxlength="40" placeholder="Poland">
+          <datalist id="countryList">
+            <option>United States</option><option>Poland</option><option>Germany</option>
+            <option>Japan</option><option>Sweden</option><option>Italy</option>
+            <option>France</option><option>United Kingdom</option><option>Austria</option>
+            <option>Canada</option><option>Netherlands</option><option>Russia</option>
+            <option>Spain</option><option>Switzerland</option><option>China</option>
+            <option>Mexico</option><option>Czechia</option><option>Belgium</option>
+          </datalist>
+        </div>
+        <div id="mintWrap">
+          <label for="f-mint">Mint (coins)</label>
+          <input id="f-mint" list="mintList" maxlength="40" placeholder="Aachen">
+          <datalist id="mintList">
+            <option>Aachen</option><option>Berlin</option><option>Paris</option>
+            <option>London</option><option>Vienna</option><option>Warsaw</option>
+            <option>Philadelphia</option><option>Denver</option><option>San Francisco</option>
+            <option>Tokyo</option>
+          </datalist>
+        </div>
+      </div>
+
       <label for="f-value" id="valueLabel">Est. value ($)</label>
       <input id="f-value" type="number" min="0" step="0.01" placeholder="0.00">
 
@@ -389,6 +414,23 @@ function yearLabel(x){
   return (x.yearTo && x.yearTo !== x.yearFrom) ? (x.yearFrom + '\u2013' + x.yearTo) : String(x.yearFrom);
 }
 
+// Display-only flag prefix; stored value stays plain text.
+const COUNTRY_FLAGS = {
+  'poland':'\ud83c\uddf5\ud83c\uddf7', 'germany':'\ud83c\udde9\ud83c\uddea',
+  'japan':'\ud83c\uddef\ud83c\uddf5', 'sweden':'\ud83c\uddf8\ud83c\uddea',
+  'italy':'\ud83c\uddee\ud83c\uddf9', 'france':'\ud83c\uddeb\ud83c\uddf7',
+  'united states':'\ud83c\uddfa\ud83c\uddf8', 'united kingdom':'\ud83c\uddec\ud83c\udde7',
+  'austria':'\ud83c\udde6\ud83c\uddf9', 'canada':'\ud83c\udde8\ud83c\udde6',
+  'netherlands':'\ud83c\uddf3\ud83c\uddf1', 'russia':'\ud83c\uddf7\ud83c\uddfa',
+  'spain':'\ud83c\uddea\ud83c\uddf8', 'switzerland':'\ud83c\udde8\ud83c\udded',
+  'china':'\ud83c\udde8\ud83c\uddf3', 'mexico':'\ud83c\uddf2\ud83c\uddfd',
+  'czechia':'\ud83c\udde8\ud83c\uddef', 'czech republic':'\ud83c\udde8\ud83c\uddef',
+  'belgium':'\ud83c\udde7\ud83c\uddea', 'denmark':'\ud83c\udde9\ud83c\uddf0'
+};
+function flagFor(country){
+  return COUNTRY_FLAGS[String(country || '').trim().toLowerCase()] || '';
+}
+
 function normalizeItem(it){
   return {
     id: it.id || uid(),
@@ -404,6 +446,8 @@ function normalizeItem(it){
     fineWt: Math.max(0, Math.min(100000, parseFloat(it.fineWt) || 0)),
     yearFrom: normYear(it.yearFrom),
     yearTo: fixYearTo(it.yearTo, it.yearFrom),
+    country: String(it.country || '').trim().slice(0, 40),
+    mint: String(it.mint || '').trim().slice(0, 40),
     created: it.created || Date.now(),
     updated: Number(it.updated) || Number(it.created) || Date.now()
   };
@@ -436,7 +480,8 @@ function filterItems(items, query, cat, sort){
     // "1920" or "1900-1950" also match by year overlap; everything else is text.
     const ym = q.match(/^(\d{3,4})(?:\s*-\s*(\d{3,4}))?$/);
     out = out.filter(x => {
-      const hay = (x.name + ' ' + x.cat + ' ' + x.cond + ' ' + x.notes + ' ' + yearLabel(x)).toLowerCase();
+      const hay = (x.name + ' ' + x.cat + ' ' + x.cond + ' ' + x.notes + ' ' +
+                   yearLabel(x) + ' ' + (x.country || '') + ' ' + (x.mint || '')).toLowerCase();
       if(hay.includes(q)) return true;
       if(ym && x.yearFrom){
         const qa = parseInt(ym[1], 10), qb = ym[2] ? parseInt(ym[2], 10) : qa;
@@ -657,6 +702,8 @@ function renderGrid(){
     const tags = [];
     if(x.cat) tags.push('<span class="tag cat">' + esc(x.cat) + '</span>');
     if(x.yearFrom) tags.push('<span class="tag year">' + esc(yearLabel(x)) + '</span>');
+    if(x.country) tags.push('<span class="tag">' + esc((flagFor(x.country) ? flagFor(x.country) + ' ' : '') + x.country) + '</span>');
+    if(x.mint) tags.push('<span class="tag">mint: ' + esc(x.mint) + '</span>');
     if(x.qty > 1) tags.push('<span class="tag">×' + x.qty + '</span>');
     if(x.cond) tags.push('<span class="tag">' + esc(x.cond) + '</span>');
     if(x.value > 0) tags.push('<span class="tag val">' +
@@ -694,6 +741,13 @@ function render(){
 }
 
 /* ---------- metal / melt UI ---------- */
+
+// Mint field only matters for coins: show it when category is empty (might be a
+// coin) or mentions coin. One input listener, no surprises on save.
+function updateMintUI(){
+  const cat = ($('f-cat').value || '').trim();
+  $('mintWrap').hidden = !(cat === '' || /coin/i.test(cat));
+}
 
 function updateMetalUI(){
   const m = $('f-metal').value;
@@ -771,6 +825,9 @@ function openModal(item, mode){
   $('condDateRow').hidden = wish;
   $('meltWrap').hidden = wish;
   $('f-year').value = item ? yearLabel(item) : '';
+  $('f-country').value = item ? (item.country || '') : '';
+  $('f-mint').value = item ? (item.mint || '') : '';
+  updateMintUI();
   $('f-name').value = item ? item.name : '';
   $('f-cat').value = item ? item.cat : '';
   $('f-qty').value = item ? item.qty : 1;
@@ -946,6 +1003,8 @@ function init(){
       fineWt: $('f-weight').value,
       yearFrom: yr.from,
       yearTo: yr.to,
+      country: $('f-country').value,
+      mint: $('f-mint').value,
       notes: $('f-notes').value,
       photo: pendingPhoto,
       created: editingId
@@ -988,6 +1047,7 @@ function init(){
   $('f-preset').innerHTML = '<option value="">coin preset…</option>' +
     SILVER_PRESETS.map(p => '<option value="' + p.id + '">' + esc(p.label) + ' · ' + p.oz + ' oz</option>').join('');
   $('f-metal').addEventListener('change', updateMetalUI);
+  $('f-cat').addEventListener('input', updateMintUI);
   $('f-preset').addEventListener('change', () => {
     const p = SILVER_PRESETS.find(x => x.id === $('f-preset').value);
     if(p) $('f-weight').value = p.oz;
@@ -1012,7 +1072,7 @@ if(typeof module !== 'undefined' && module.exports){
   module.exports = {
     uid, normalizeItem, upsertItem, removeItem, filterItems, stats, esc, DEFAULT_CATS,
     meltValue, worth, recordHistory, sparkPath, SILVER_PRESETS, fmt, qtyOf, mergeItems,
-    parseYearRange, yearLabel, normYear, cmpYearAsc, cmpYearDesc
+    parseYearRange, yearLabel, normYear, cmpYearAsc, cmpYearDesc, flagFor
   };
 }
 </script>
