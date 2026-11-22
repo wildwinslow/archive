@@ -175,7 +175,7 @@
   .rollphoto{width:100%; max-height:300px; object-fit:contain; background:var(--panel2); border-radius:10px; margin-bottom:10px}
   body.locked #fab, body.locked .acts, body.locked #deleteBtn,
   body.locked #exportBtn, body.locked #importBtn, body.locked #mergeBtn,
-  body.locked #shareBtn, body.locked #setAddBtn { display:none !important; }
+  body.locked #shareBtn, body.locked #setAddBtn, body.locked #resetHist { display:none !important; }
   .viewerbanner{background:#241d10; color:#ffcf87; text-align:center; font-size:12px; padding:6px}
   .spotline{font-family:ui-monospace,Menlo,Consolas,monospace; font-size:11px; color:var(--dim); margin-top:8px}
   .spotline b{color:#ffcf87; font-weight:600}
@@ -852,7 +852,8 @@ function renderPortfolio(){
   const h = state.history || [];
   if(h.length < 2){
     el.innerHTML =
-      '<div class="pf-head"><span>portfolio</span><b>$' + fmt(s.portfolio) + '</b></div>' +
+      '<div class="pf-head"><span>portfolio</span><b>$' + fmt(s.portfolio) + '</b>' +
+      '<button class="chip" id="resetHist">reset trend</button></div>' +
       '<div class="pf-hint">the trend line builds one point per day you open the archive</div>';
     return;
   }
@@ -866,6 +867,7 @@ function renderPortfolio(){
       '<span>portfolio · since ' + d1 + ' <span class="pf-delta ' + cls + '">' +
         arrow + ' $' + fmt(Math.abs(delta)) + '</span></span>' +
       '<b>$' + fmt(last.v) + '</b>' +
+      '<button class="chip" id="resetHist">reset trend</button>' +
     '</div>' +
     '<svg class="spark" viewBox="0 0 300 56" preserveAspectRatio="none" aria-hidden="true">' +
       '<path d="' + sparkPath(h, 300, 56) + '" fill="none" stroke="#e8a33d" stroke-width="2" vector-effect="non-scaling-stroke"/>' +
@@ -1412,6 +1414,15 @@ function init(){
   $('viewWishlist').addEventListener('click', () => setView('wishlist'));
   $('viewSets').addEventListener('click', () => setView('sets'));
   $('viewMap').addEventListener('click', () => setView('map'));
+  $('portfolio').addEventListener('click', e => {
+    if(e.target.id !== 'resetHist') return;
+    if(locked || viewerMode) return;
+    if(confirm('Wipe the trend line and start fresh?')){
+      state.history = [];
+      persist();
+      render();
+    }
+  });
   $('rollBtn').addEventListener('click', openRoll);
   $('rollClose').addEventListener('click', () => { $('rollOverlay').hidden = true; });
   $('rollAgain').addEventListener('click', openRoll);
