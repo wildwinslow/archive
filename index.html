@@ -163,6 +163,20 @@
     font-family:ui-monospace,Menlo,Consolas,monospace; letter-spacing:.04em;
   }
   .viewbtn.on{background:var(--brass); border-color:var(--brass); color:#17130a; font-weight:700}
+  .tag.verify{color:#8fbf6a; border-color:#33452a}
+  .mapwrap{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px}
+  .mapwrap svg{width:100%; height:auto; display:block}
+  .maplegend{display:flex; flex-wrap:wrap; gap:8px; margin-top:10px}
+  .setcard{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px}
+  .bar{height:8px; background:var(--panel2); border-radius:999px; overflow:hidden; margin:8px 0}
+  .bar>i{display:block; height:100%; background:var(--brass)}
+  .setentry{display:flex; gap:8px; align-items:center; padding:5px 0; font-size:13px; color:var(--dim); cursor:pointer}
+  .setentry.done{color:var(--green)}
+  .rollphoto{width:100%; max-height:300px; object-fit:contain; background:var(--panel2); border-radius:10px; margin-bottom:10px}
+  body.locked #fab, body.locked .acts, body.locked #deleteBtn,
+  body.locked #exportBtn, body.locked #importBtn, body.locked #mergeBtn,
+  body.locked #shareBtn, body.locked #setAddBtn { display:none !important; }
+  .viewerbanner{background:#241d10; color:#ffcf87; text-align:center; font-size:12px; padding:6px}
   .spotline{font-family:ui-monospace,Menlo,Consolas,monospace; font-size:11px; color:var(--dim); margin-top:8px}
   .spotline b{color:#ffcf87; font-weight:600}
   .portfolio{margin:12px 16px 0; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px 14px}
@@ -197,14 +211,19 @@
 </div>
 
 <div class="viewbar">
-  <button class="viewbtn on" id="viewCollection">📦 collection</button>
-  <button class="viewbtn" id="viewWishlist">🎯 wishlist</button>
+  <button class="viewbtn on" id="viewCollection">📦 items</button>
+  <button class="viewbtn" id="viewWishlist">🎯 wants</button>
+  <button class="viewbtn" id="viewSets">📚 sets</button>
+  <button class="viewbtn" id="viewMap">🗺 map</button>
 </div>
 
 <div class="chips" id="chips"></div>
 <main id="grid"></main>
 
 <div class="foot">
+  <button id="rollBtn">🎲 roll</button>
+  <button id="lockBtn">🔒 lock</button>
+  <button id="shareBtn">🔗 share snapshot</button>
   <button id="exportBtn">⬇ export backup</button>
   <button id="importBtn">⬆ import backup</button>
   <button id="mergeBtn">➕ merge file</button>
@@ -290,6 +309,21 @@
         </datalist>
       </div>
 
+      <div class="row" id="paidWrap">
+        <div>
+          <label for="f-paid">What I paid ($)</label>
+          <input id="f-paid" type="number" min="0" step="0.01" placeholder="0.00">
+        </div>
+        <div>
+          <label for="f-verified">Verification</label>
+          <select id="f-verified">
+            <option value="">unverified</option>
+            <option value="rook">Rook-verified</option>
+            <option value="user">self-verified</option>
+          </select>
+        </div>
+      </div>
+
       <label for="f-value" id="valueLabel">Est. value ($)</label>
       <input id="f-value" type="number" min="0" step="0.01" placeholder="0.00">
 
@@ -332,6 +366,53 @@
   </div>
 </div>
 
+<div class="modal" id="rollOverlay" hidden>
+  <div class="sheet">
+    <h2>Collection Roulette</h2>
+    <div id="rollBody"></div>
+    <div class="btns">
+      <button type="button" class="big cancel" id="rollClose">Close</button>
+      <button type="button" class="big save" id="rollAgain">🎲 roll again</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="setModal" hidden>
+  <div class="sheet">
+    <h2 id="setModalTitle">New set</h2>
+    <form id="setForm">
+      <label for="s-name">Set name</label>
+      <input id="s-name" maxlength="80" placeholder="Mercury dimes 1916-1945" required>
+      <label for="s-desc">Description</label>
+      <input id="s-desc" maxlength="200" placeholder="date set, one per year">
+      <label for="s-entries">Entries (one per line: label | year)</label>
+      <textarea id="s-entries" style="min-height:160px" placeholder="1916-D | 1916&#10;1916-S | 1916&#10;1921 | 1921"></textarea>
+      <div class="btns">
+        <button type="button" class="big cancel" id="setCancel">Cancel</button>
+        <button type="submit" class="big save">Save set</button>
+      </div>
+      <button type="button" class="kill" id="setDelete" hidden>⚠ Delete this set</button>
+    </form>
+  </div>
+</div>
+
+<div class="modal" id="passOverlay" hidden>
+  <div class="sheet">
+    <h2 id="passTitle">Enter passcode</h2>
+    <p id="passHint" style="color:var(--dim); font-size:13px; margin-bottom:6px"></p>
+    <label for="passInput">Passcode</label>
+    <input id="passInput" type="password" autocomplete="off">
+    <div id="passConfirmRow" hidden>
+      <label for="passConfirm">Confirm passcode</label>
+      <input id="passConfirm" type="password" autocomplete="off">
+    </div>
+    <div class="btns">
+      <button type="button" class="big cancel" id="passCancel">Cancel</button>
+      <button type="button" class="big save" id="passSubmit">Unlock</button>
+    </div>
+  </div>
+</div>
+
 <script>
 'use strict';
 
@@ -367,12 +448,13 @@ function loadState(){
       return {
         items: Array.isArray(d.items) ? d.items : [],
         wishlist: Array.isArray(d.wishlist) ? d.wishlist : [],
+        sets: Array.isArray(d.sets) ? d.sets.map(normalizeSet) : [],
         cats:  Array.isArray(d.cats) && d.cats.length ? d.cats : DEFAULT_CATS.slice(),
         history: Array.isArray(d.history) ? d.history.filter(p => p && typeof p.d === 'string' && typeof p.v === 'number') : []
       };
     }
   }catch(e){ /* corrupted or unavailable storage → start clean */ }
-  return { items: [], wishlist: [], cats: DEFAULT_CATS.slice(), history: [] };
+  return { items: [], wishlist: [], sets: [], cats: DEFAULT_CATS.slice(), history: [] };
 }
 
 // Merge incoming entries into local list by id.
@@ -444,6 +526,103 @@ function flagFor(country){
   return COUNTRY_FLAGS[String(country || '').trim().toLowerCase()] || '';
 }
 
+/* ---- sets (set-completion tracking) ---- */
+function normalizeSetEntry(e){
+  return {
+    id: e.id || uid(),
+    label: String(e.label || '').slice(0, 80),
+    year: normYear(e.year),
+    owned: !!e.owned
+  };
+}
+function normalizeSet(s){
+  return {
+    id: s.id || uid(),
+    name: String(s.name || 'Untitled set').slice(0, 80),
+    desc: String(s.desc || '').slice(0, 200),
+    created: s.created || Date.now(),
+    entries: Array.isArray(s.entries) ? s.entries.map(normalizeSetEntry) : []
+  };
+}
+function setProgress(set){
+  const entries = (set && set.entries) || [];
+  const total = entries.length;
+  const owned = entries.filter(e => e.owned).length;
+  return { owned, total, pct: total ? Math.round(owned / total * 100) : 0 };
+}
+
+/* ---- origins map (constellation style, equirectangular) ---- */
+const COUNTRY_COORDS = {
+  'united states':[39.8,-98.6], 'poland':[52.1,19.4], 'germany':[51.2,10.4],
+  'japan':[36.2,138.3], 'sweden':[62.2,15.3], 'italy':[42.8,12.6],
+  'france':[46.6,2.4], 'united kingdom':[54.0,-2.5], 'austria':[47.6,14.2],
+  'canada':[56.1,-106.3], 'netherlands':[52.2,5.5], 'russia':[61.5,90.0],
+  'spain':[40.2,-3.7], 'switzerland':[46.8,8.2], 'china':[35.9,104.2],
+  'mexico':[23.6,-102.5], 'czechia':[49.8,15.5], 'czech republic':[49.8,15.5],
+  'belgium':[50.6,4.6], 'denmark':[56.0,9.5]
+};
+function originMap(items, spot){
+  const by = {};
+  (items || []).forEach(x => {
+    const k = String(x.country || '').trim();
+    if(!k) return;
+    const e = by[k] || (by[k] = { country: k, count: 0, value: 0, lat: null, lng: null });
+    e.count += qtyOf(x);
+    e.value += worth(x, spot);
+    const c = COUNTRY_COORDS[k.toLowerCase()];
+    if(c){ e.lat = c[0]; e.lng = c[1]; }
+  });
+  return Object.values(by).sort((a, b) => b.count - a.count);
+}
+function mapXY(lat, lng, w, h){
+  return [ ((lng + 180) / 360) * w, ((90 - lat) / 180) * h ];
+}
+
+/* ---- collection roulette ---- */
+function rollItem(list){
+  if(!Array.isArray(list) || !list.length) return null;
+  return list[Math.floor(Math.random() * list.length)];
+}
+
+/* ---- passcode + encrypted share snapshot (WebCrypto) ---- */
+function b64enc(buf){
+  const bytes = new Uint8Array(buf);
+  let s = '';
+  for(let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+  return btoa(s);
+}
+function b64dec(str){
+  const s = atob(str);
+  const bytes = new Uint8Array(s.length);
+  for(let i = 0; i < s.length; i++) bytes[i] = s.charCodeAt(i);
+  return bytes;
+}
+async function sha256Hex(text){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+async function deriveKey(pass, saltBytes){
+  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt: saltBytes, iterations: 150000, hash: 'SHA-256' },
+    base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
+  );
+}
+// Full archive state -> passcode-locked snapshot file (the key never leaves the passcode).
+async function encryptSnapshot(stateObj, pass){
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await deriveKey(pass, salt);
+  const plain = new TextEncoder().encode(JSON.stringify(stateObj));
+  const data = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plain);
+  return { v: 1, kdf: 'PBKDF2-150k-SHA256', salt: b64enc(salt), iv: b64enc(iv), data: b64enc(data) };
+}
+async function decryptSnapshot(file, pass){
+  const key = await deriveKey(pass, b64dec(file.salt));
+  const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64dec(file.iv) }, key, b64dec(file.data));
+  return JSON.parse(new TextDecoder().decode(plain));
+}
+
 function normalizeItem(it){
   return {
     id: it.id || uid(),
@@ -462,6 +641,8 @@ function normalizeItem(it){
     country: String(it.country || '').trim().slice(0, 40),
     mint: String(it.mint || '').trim().slice(0, 40),
     denom: String(it.denom || '').trim().slice(0, 40),
+    paid: Math.max(0, parseFloat(it.paid) || 0),
+    verified: it.verified === 'rook' || it.verified === 'user' ? it.verified : '',
     created: it.created || Date.now(),
     updated: Number(it.updated) || Number(it.created) || Date.now()
   };
@@ -547,9 +728,10 @@ function stats(state, spot){
   const meltItems = state.items.filter(x => x.metal && x.fineWt > 0);
   const melt = meltItems.reduce((s,x) => s + meltValue(x, spot), 0);
   const portfolio = state.items.reduce((s,x) => s + worth(x, spot), 0);
+  const paid = state.items.reduce((s,x) => s + (x.paid || 0), 0);
   return {
     entries: state.items.length, pieces, total, valued: valued.length,
-    melt, meltItems: meltItems.length, portfolio
+    melt, meltItems: meltItems.length, portfolio, paid
   };
 }
 
@@ -589,6 +771,10 @@ function esc(s){
 /* ---------- browser layer ---------- */
 
 let state = loadState();
+// Captured at boot, before init()/render() write anything: an empty first
+// load must still count as a fresh device for the shared-viewer gate.
+let bootEmpty = true;
+try{ bootEmpty = !localStorage.getItem(KEY); }catch(e){ bootEmpty = false; }
 let editingId = null;
 let editingList = 'items'; // which array the open modal edits: 'items' | 'wishlist'
 let pendingPhoto = null;   // dataURL staged in the form
@@ -614,6 +800,7 @@ function setView(v){
 const $ = id => document.getElementById(id);
 
 function persist(){
+  if(viewerMode) return true;
   try{
     localStorage.setItem(KEY, JSON.stringify(state));
     return true;
@@ -631,6 +818,11 @@ function renderStats(){
     '<div><b>$' + fmt(s.total) + '</b><span>est. value (' + s.valued + ' valued)</span></div>' +
     (s.meltItems
       ? '<div><b>$' + fmt(s.melt) + '</b><span>live melt (' + s.meltItems + ' metal)</span></div>'
+      : '') +
+    (s.paid > 0
+      ? '<div><b style="color:' + (s.portfolio - s.paid >= 0 ? '#8fbf6a' : '#d9553f') + '">$' +
+        fmt(Math.abs(s.portfolio - s.paid)) + '</b><span>' +
+        (s.portfolio - s.paid >= 0 ? 'gain vs paid' : 'underwater vs paid') + '</span></div>'
       : '') +
     '<div><b>' + state.cats.length + '</b><span>categories</span></div>';
 }
@@ -675,6 +867,7 @@ function renderPortfolio(){
 
 // Daily snapshot: record today's portfolio value, persist only if it changed.
 function snapshotToday(){
+  if(!(state.items || []).length && !(state.wishlist || []).length) return;
   const s = stats(state, spot);
   const day = new Date().toISOString().slice(0, 10);
   const before = JSON.stringify(state.history || []);
@@ -683,6 +876,7 @@ function snapshotToday(){
 }
 
 function renderChips(){
+  if(view === 'sets' || view === 'map'){ $('chips').innerHTML = ''; return; }
   const list = activeList();
   const counts = {};
   list.forEach(x => { counts[x.cat] = (counts[x.cat]||0) + 1; });
@@ -695,6 +889,8 @@ function renderChips(){
 }
 
 function renderGrid(){
+  if(view === 'map'){ renderMapView($('grid')); return; }
+  if(view === 'sets'){ renderSetsView($('grid')); return; }
   const list = activeList();
   const rows = filterItems(list, $('search').value, activeCat, $('sort').value);
   const grid = $('grid');
@@ -720,6 +916,8 @@ function renderGrid(){
     if(x.yearFrom) tags.push('<span class="tag year">' + esc(yearLabel(x)) + '</span>');
     if(x.country) tags.push('<span class="tag">' + esc((flagFor(x.country) ? flagFor(x.country) + ' ' : '') + x.country) + '</span>');
     if(x.mint) tags.push('<span class="tag">mint: ' + esc(x.mint) + '</span>');
+    if(x.paid > 0) tags.push('<span class="tag">paid $' + fmt(x.paid) + '</span>');
+    if(x.verified) tags.push('<span class="tag verify">' + (x.verified === 'rook' ? '✓ rook' : '✓ yours') + '</span>');
     if(x.qty > 1) tags.push('<span class="tag">×' + x.qty + '</span>');
     if(x.cond) tags.push('<span class="tag">' + esc(x.cond) + '</span>');
     if(x.value > 0) tags.push('<span class="tag val">' +
@@ -739,10 +937,245 @@ function renderGrid(){
   }).join('');
 }
 
+/* ---- origins map view ---- */
+function renderMapView(grid){
+  const rows = originMap(state.items, spot);
+  if(!rows.length){
+    grid.innerHTML = '<div class="empty"><b>NO ORIGINS YET</b>Give items a country of origin and the world fills in.</div>';
+    return;
+  }
+  const w = 600, h = 300;
+  let svg = '<svg viewBox="0 0 600 300" aria-hidden="true">';
+  for(let lng = -120; lng <= 120; lng += 60){
+    const x = ((lng + 180) / 360) * w;
+    svg += '<line x1="' + x + '" y1="0" x2="' + x + '" y2="' + h + '" stroke="#33332a"/>';
+  }
+  for(let lat = -60; lat <= 60; lat += 30){
+    const y = ((90 - lat) / 180) * h;
+    svg += '<line x1="0" y1="' + y + '" x2="' + w + '" y2="' + y + '" stroke="#33332a"/>';
+  }
+  svg += '<line x1="0" y1="150" x2="600" y2="150" stroke="#45443a"/>';
+  svg += '<line x1="300" y1="0" x2="300" y2="300" stroke="#45443a"/>';
+  rows.forEach(e => {
+    if(e.lat === null) return;
+    const xy = mapXY(e.lat, e.lng, w, h);
+    const r = 5 + Math.min(18, Math.sqrt(e.count) * 5);
+    svg += '<circle cx="' + xy[0].toFixed(1) + '" cy="' + xy[1].toFixed(1) + '" r="' + r.toFixed(1) +
+      '" fill="#e8a33d" fill-opacity="0.7" stroke="#b87d24"/>';
+    svg += '<text x="' + (xy[0] + r + 4).toFixed(1) + '" y="' + (xy[1] + 4).toFixed(1) +
+      '" fill="#e8e4d8" font-size="11">' + esc(flagFor(e.country) + ' ' + e.country) + '</text>';
+  });
+  svg += '</svg>';
+  const legend = rows.map(e => '<span class="tag">' +
+    esc((flagFor(e.country) ? flagFor(e.country) + ' ' : '') + e.country + ' x' + e.count) + '</span>').join('');
+  const mapped = rows.filter(e => e.lat !== null).length;
+  grid.innerHTML = '<div class="mapwrap"><div class="pf-head"><span>origins</span><b>' +
+    mapped + ' countries mapped</b></div>' + svg + '<div class="maplegend">' + legend + '</div></div>';
+}
+
+/* ---- sets view ---- */
+function renderSetsView(grid){
+  const sets = state.sets || [];
+  const addBtn = '<button id="setAddBtn" class="big save" style="width:100%; margin-bottom:12px">+ new set</button>';
+  if(!sets.length){
+    grid.innerHTML = addBtn + '<div class="empty"><b>NO SETS YET</b>Define a set — Mercury dimes 1916-1945 — and the archive starts tracking the gaps.</div>';
+    return;
+  }
+  grid.innerHTML = addBtn + sets.map(s => {
+    const p = setProgress(s);
+    return '<div class="setcard"><div class="pf-head"><span>' + esc(s.name) + '</span><b>' +
+      p.owned + '/' + p.total + ' · ' + p.pct + '%</b></div>' +
+      (s.desc ? '<div class="pf-hint">' + esc(s.desc) + '</div>' : '') +
+      '<div class="bar"><i style="width:' + p.pct + '%"></i></div>' +
+      s.entries.map(e => '<div class="setentry' + (e.owned ? ' done' : '') + '" data-setcheck="' + s.id + '|' + e.id + '">' +
+        (e.owned ? '☑ ' : '☐ ') + esc(e.label) + (e.year ? ' · ' + e.year : '') + '</div>').join('') +
+      '<div style="margin-top:10px"><button class="chip" data-setedit="' + s.id + '">edit</button> ' +
+      '<button class="chip" data-setdel="' + s.id + '">delete</button></div></div>';
+  }).join('');
+}
+
+/* ---- sets modal ---- */
+let editingSetId = null;
+function openSetModal(set){
+  editingSetId = set ? set.id : null;
+  $('setModalTitle').textContent = set ? 'Edit set' : 'New set';
+  $('s-name').value = set ? set.name : '';
+  $('s-desc').value = set ? (set.desc || '') : '';
+  const NL = String.fromCharCode(10);
+  $('s-entries').value = set ? set.entries.map(e => e.label + (e.year ? ' | ' + e.year : '')).join(NL) : '';
+  $('setDelete').hidden = !set;
+  $('setModal').hidden = false;
+}
+function closeSetModal(){ $('setModal').hidden = true; editingSetId = null; }
+function onSetSubmit(e){
+  e.preventDefault();
+  const name = $('s-name').value.trim();
+  if(!name) return;
+  const NL = String.fromCharCode(10);
+  const lines = $('s-entries').value.split(NL).map(l => l.trim()).filter(Boolean);
+  const existing = editingSetId ? (state.sets || []).find(x => x.id === editingSetId) : null;
+  const oldOwned = {};
+  if(existing) existing.entries.forEach(en => { oldOwned[en.label] = en.owned; });
+  const entries = lines.map(line => {
+    const parts = line.split('|').map(p => p.trim());
+    return normalizeSetEntry({ label: parts[0], year: parts[1] || 0, owned: !!oldOwned[parts[0]] });
+  });
+  const set = normalizeSet({
+    id: editingSetId || uid(), name, desc: $('s-desc').value.trim(),
+    created: existing ? existing.created : Date.now(), entries
+  });
+  if(!Array.isArray(state.sets)) state.sets = [];
+  if(existing) state.sets[state.sets.indexOf(existing)] = set;
+  else state.sets.unshift(set);
+  persist(); render(); closeSetModal();
+}
+function onSetDelete(){
+  if(!editingSetId) return;
+  const set = (state.sets || []).find(x => x.id === editingSetId);
+  if(set && confirm('Delete the set ' + set.name + '?')){
+    state.sets = state.sets.filter(x => x.id !== editingSetId);
+    persist(); render(); closeSetModal();
+  }
+}
+
+/* ---- roulette ---- */
+function openRoll(){
+  const it = rollItem(activeList());
+  const body = $('rollBody');
+  if(!it){
+    body.innerHTML = '<div class="pf-hint">Nothing to roll in this view yet.</div>';
+    $('rollOverlay').hidden = false;
+    return;
+  }
+  const tags = [];
+  if(it.cat) tags.push('<span class="tag cat">' + esc(it.cat) + '</span>');
+  if(it.denom) tags.push('<span class="tag">' + esc(it.denom) + '</span>');
+  if(it.yearFrom) tags.push('<span class="tag year">' + esc(yearLabel(it)) + '</span>');
+  if(it.country) tags.push('<span class="tag">' + esc((flagFor(it.country) ? flagFor(it.country) + ' ' : '') + it.country) + '</span>');
+  if(it.mint) tags.push('<span class="tag">mint: ' + esc(it.mint) + '</span>');
+  if(it.value > 0) tags.push('<span class="tag val">$' + fmt(it.value) + '</span>');
+  body.innerHTML = (it.photo ? '<img class="rollphoto" src="' + it.photo + '" alt="">' : '') +
+    '<div class="name" style="font-size:18px">' + esc(it.name) + '</div>' +
+    '<div class="meta">' + tags.join('') + '</div>' +
+    (it.notes ? '<div class="notes" style="margin-top:8px">' + esc(it.notes) + '</div>' : '');
+  $('rollOverlay').hidden = false;
+}
+
+/* ---- passcode lock / share snapshot ---- */
+const PASS_KEY = 'winslow.pass.v1';
+let locked = false;
+let viewerMode = false;
+let passMode = null;
+let viewerFile = null;
+
+async function getPassRec(){
+  try{ return JSON.parse(localStorage.getItem(PASS_KEY) || 'null'); }catch(e){ return null; }
+}
+function openPass(mode){
+  passMode = mode;
+  $('passTitle').textContent = mode === 'create' ? 'Create a passcode'
+    : mode === 'share' ? 'Encrypt a share snapshot'
+    : mode === 'shareview' ? 'Shared archive'
+    : 'Enter passcode';
+  $('passHint').textContent = mode === 'create'
+    ? 'Locks the app into view-only mode. It is also the encryption key for shared snapshots — friends who view the archive enter this same code.'
+    : mode === 'share'
+    ? 'Your archive is encrypted with this passcode and downloaded as a file. Send the file to Rook to publish; viewers enter this code to decrypt it in their browser.'
+    : mode === 'shareview'
+    ? 'This collection is encrypted. Enter the passcode Winslow gave you.'
+    : 'Enter the passcode to return to edit mode.';
+  $('passConfirmRow').hidden = mode !== 'create';
+  $('passInput').value = '';
+  $('passConfirm').value = '';
+  $('passSubmit').textContent = mode === 'share' ? 'Encrypt' : mode === 'create' ? 'Create and lock' : mode === 'shareview' ? 'View' : 'Unlock';
+  $('passCancel').hidden = (mode === 'shareview');
+  $('passOverlay').hidden = false;
+}
+function setLocked(v){
+  locked = v;
+  document.body.classList.toggle('locked', v);
+  $('lockBtn').textContent = v ? '🔓 unlock' : '🔒 lock';
+  render();
+}
+async function onPassSubmit(){
+  const pass = $('passInput').value;
+  if(!pass){ $('passHint').textContent = 'Type something first.'; return; }
+  const rec = await getPassRec();
+  if(passMode === 'create'){
+    if(pass.length < 4){ $('passHint').textContent = 'Use at least 4 characters.'; return; }
+    if(pass !== $('passConfirm').value){ $('passHint').textContent = 'The two entries do not match.'; return; }
+    const salt = Array.from(crypto.getRandomValues(new Uint8Array(8))).map(b => b.toString(16).padStart(2, '0')).join('');
+    const hash = await sha256Hex(salt + pass);
+    try{ localStorage.setItem(PASS_KEY, JSON.stringify({ salt, hash })); }catch(e){}
+    $('passOverlay').hidden = true;
+    setLocked(true);
+  } else if(passMode === 'unlock'){
+    if(!rec){ $('passOverlay').hidden = true; setLocked(false); return; }
+    const hash = await sha256Hex(rec.salt + pass);
+    if(hash === rec.hash){ $('passOverlay').hidden = true; setLocked(false); }
+    else { $('passHint').textContent = 'Wrong passcode.'; }
+  } else if(passMode === 'share'){
+    const snap = await encryptSnapshot({
+      items: state.items, wishlist: state.wishlist || [], sets: state.sets || [],
+      cats: state.cats, history: state.history || []
+    }, pass);
+    const blob = new Blob([JSON.stringify(snap)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'archive-share.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    $('passOverlay').hidden = true;
+    $('mergeStatus').textContent = 'snapshot encrypted + downloaded — send it to Rook to publish';
+  } else if(passMode === 'shareview'){
+    try{
+      const d = await decryptSnapshot(viewerFile, pass);
+      state = {
+        items: (d.items || []).map(normalizeItem),
+        wishlist: (d.wishlist || []).map(normalizeItem),
+        sets: (d.sets || []).map(normalizeSet),
+        cats: Array.isArray(d.cats) && d.cats.length ? d.cats : DEFAULT_CATS.slice(),
+        history: Array.isArray(d.history) ? d.history : []
+      };
+      viewerMode = true;
+      $('passOverlay').hidden = true;
+      document.body.classList.add('locked');
+      $('lockBtn').style.display = 'none';
+      $('shareBtn').style.display = 'none';
+      render();
+    }catch(e){ $('passHint').textContent = 'Wrong passcode.'; }
+  }
+}
+async function onLockBtn(){
+  if(viewerMode) return;
+  if(locked){ openPass('unlock'); return; }
+  const rec = await getPassRec();
+  if(rec) setLocked(true);
+  else openPass('create');
+}
+// Remote viewer bootstrap: no local data + a published share.json = passcode gate.
+async function trySharedViewer(){
+  if(!bootEmpty) return;
+  try{
+    const r = await fetch('share.json?ts=' + Date.now());
+    if(!r.ok) return;
+    viewerFile = await r.json();
+    if(!viewerFile || !viewerFile.data) return;
+    const banner = document.createElement('div');
+    banner.className = 'viewerbanner';
+    banner.textContent = '👀 shared archive — read-only';
+    document.body.insertBefore(banner, document.body.firstChild);
+    openPass('shareview');
+  }catch(e){ /* no share file published — plain empty app */ }
+}
+
 function renderViewbar(){
   $('viewCollection').classList.toggle('on', view === 'collection');
   $('viewWishlist').classList.toggle('on', view === 'wishlist');
-  $('viewWishlist').textContent = '🎯 wishlist (' + ((state.wishlist || []).length) + ')';
+  $('viewSets').classList.toggle('on', view === 'sets');
+  $('viewMap').classList.toggle('on', view === 'map');
+  $('viewWishlist').textContent = '🎯 wants (' + ((state.wishlist || []).length) + ')';
+  $('viewSets').textContent = '📚 sets (' + ((state.sets || []).length) + ')';
 }
 
 function render(){
@@ -842,10 +1275,13 @@ function openModal(item, mode){
   $('qtyWrap').hidden = wish;
   $('condDateRow').hidden = wish;
   $('meltWrap').hidden = wish;
+  $('paidWrap').hidden = wish;
   $('f-year').value = item ? yearLabel(item) : '';
   $('f-country').value = item ? (item.country || '') : '';
   $('f-mint').value = item ? (item.mint || '') : '';
   $('f-denom').value = item ? (item.denom || '') : '';
+  $('f-paid').value = item && item.paid ? item.paid : '';
+  $('f-verified').value = item ? (item.verified || '') : '';
   updateMintUI();
   $('f-name').value = item ? item.name : '';
   $('f-cat').value = item ? item.cat : '';
@@ -959,6 +1395,20 @@ function init(){
   $('fab').addEventListener('click', () => openModal(null, view));
   $('viewCollection').addEventListener('click', () => setView('collection'));
   $('viewWishlist').addEventListener('click', () => setView('wishlist'));
+  $('viewSets').addEventListener('click', () => setView('sets'));
+  $('viewMap').addEventListener('click', () => setView('map'));
+  $('rollBtn').addEventListener('click', openRoll);
+  $('rollClose').addEventListener('click', () => { $('rollOverlay').hidden = true; });
+  $('rollAgain').addEventListener('click', openRoll);
+  $('rollOverlay').addEventListener('click', e => { if(e.target === $('rollOverlay')) $('rollOverlay').hidden = true; });
+  $('lockBtn').addEventListener('click', onLockBtn);
+  $('shareBtn').addEventListener('click', () => { if(!viewerMode) openPass('share'); });
+  $('passCancel').addEventListener('click', () => { $('passOverlay').hidden = true; });
+  $('passSubmit').addEventListener('click', onPassSubmit);
+  $('setCancel').addEventListener('click', closeSetModal);
+  $('setDelete').addEventListener('click', onSetDelete);
+  $('setForm').addEventListener('submit', onSetSubmit);
+  $('setModal').addEventListener('click', e => { if(e.target === $('setModal')) closeSetModal(); });
   $('cancelBtn').addEventListener('click', closeModal);
   $('modal').addEventListener('click', e => { if(e.target === $('modal')) closeModal(); });
 
@@ -974,6 +1424,30 @@ function init(){
   });
 
   $('grid').addEventListener('click', e => {
+    const sc = e.target.closest('[data-setcheck]');
+    if(sc && !locked && !viewerMode){
+      const ids = sc.dataset.setcheck.split('|');
+      const set = (state.sets || []).find(x => x.id === ids[0]);
+      const entry = set && set.entries.find(x => x.id === ids[1]);
+      if(entry){ entry.owned = !entry.owned; persist(); render(); }
+      return;
+    }
+    const se = e.target.closest('[data-setedit]');
+    if(se && !locked && !viewerMode){
+      const set = (state.sets || []).find(x => x.id === se.dataset.setedit);
+      if(set) openSetModal(set);
+      return;
+    }
+    const sd = e.target.closest('[data-setdel]');
+    if(sd && !locked && !viewerMode){
+      const set = (state.sets || []).find(x => x.id === sd.dataset.setdel);
+      if(set && confirm('Delete the set ' + set.name + '?')){
+        state.sets = state.sets.filter(x => x.id !== sd.dataset.setdel);
+        persist(); render();
+      }
+      return;
+    }
+    if(e.target.id === 'setAddBtn'){ openSetModal(null); return; }
     const ed = e.target.closest('[data-edit]');
     if(ed){
       const it = activeList().find(x => x.id === ed.dataset.edit);
@@ -1025,6 +1499,8 @@ function init(){
       country: $('f-country').value,
       mint: $('f-mint').value,
       denom: $('f-denom').value,
+      paid: $('f-paid').value,
+      verified: $('f-verified').value,
       notes: $('f-notes').value,
       photo: pendingPhoto,
       created: editingId
@@ -1076,6 +1552,7 @@ function init(){
 
   render();
   loadSpot();   // async: repaints with live silver/gold when it lands
+  trySharedViewer(); // remote viewer gate if a published snapshot exists
 
   // PWA: register service worker (https or localhost only)
   if('serviceWorker' in navigator &&
@@ -1092,7 +1569,9 @@ if(typeof module !== 'undefined' && module.exports){
   module.exports = {
     uid, normalizeItem, upsertItem, removeItem, filterItems, stats, esc, DEFAULT_CATS,
     meltValue, worth, recordHistory, sparkPath, SILVER_PRESETS, fmt, qtyOf, mergeItems,
-    parseYearRange, yearLabel, normYear, cmpYearAsc, cmpYearDesc, flagFor
+    parseYearRange, yearLabel, normYear, cmpYearAsc, cmpYearDesc, flagFor,
+    normalizeSet, normalizeSetEntry, setProgress, originMap, mapXY, rollItem,
+    encryptSnapshot, decryptSnapshot, sha256Hex
   };
 }
 </script>
