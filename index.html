@@ -164,6 +164,8 @@
   }
   .viewbtn.on{background:var(--brass); border-color:var(--brass); color:#17130a; font-weight:700}
   .tag.verify{color:#8fbf6a; border-color:#33452a}
+  a.tag.verify{text-decoration: none}
+  a.tag.verify:hover{border-color:#8fbf6a}
   .mapwrap{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px}
   .mapwrap svg{width:100%; height:auto; display:block}
   .maplegend{display:flex; flex-wrap:wrap; gap:8px; margin-top:10px}
@@ -533,6 +535,32 @@ const COUNTRY_FLAGS = {
 };
 function flagFor(country){
   return COUNTRY_FLAGS[String(country || '').trim().toLowerCase()] || '';
+}
+
+// Parse grader + cert number out of the grade text and build the grader's
+// verification link. PCGS/NGC deep-link to the cert (community-documented
+// URL shapes; their worst case still lands on the correct verify page).
+// ANACS/ICG use form-only lookups, so they land on the verify page.
+const CERT_URLS = {
+  pcgs: 'https://www.pcgs.com/cert/',
+  ngc: 'https://www.ngccoin.com/certlookup/',
+  anacs: 'https://anacs.com/verify/',
+  icg: 'https://www.icgcoin.com/verification/'
+};
+function certLink(gradeText){
+  const s = String(gradeText || '');
+  const low = s.toLowerCase();
+  let grader = null;
+  if(low.includes('pcgs')) grader = 'pcgs';
+  else if(low.includes('ngc')) grader = 'ngc';
+  else if(low.includes('anacs')) grader = 'anacs';
+  else if(low.includes('icg')) grader = 'icg';
+  if(!grader) return null;
+  const m = s.match(/\d[\d\s-]{4,}/);
+  if(!m) return null;
+  const cert = m[0].trim().replace(/\s+/g, '');
+  const deep = (grader === 'pcgs' || grader === 'ngc');
+  return { grader, cert, deep, url: deep ? CERT_URLS[grader] + cert : CERT_URLS[grader] };
 }
 
 /* ---- sets (set-completion tracking) ---- */
@@ -1000,9 +1028,14 @@ function renderGrid(){
     if(x.country) tags.push('<span class="tag">' + esc((flagFor(x.country) ? flagFor(x.country) + ' ' : '') + x.country) + '</span>');
     if(x.mint) tags.push('<span class="tag">mint: ' + esc(x.mint) + '</span>');
     if(x.paid > 0) tags.push('<span class="tag">paid $' + fmt(x.paid) + '</span>');
-    if(x.verified) tags.push('<span class="tag verify">' +
-      (x.verified === 'rook' ? '✓ rook' : x.verified === 'user' ? '✓ yours' : '✓ graded') +
-      (x.verified === 'graded' && x.grade ? ' · ' + esc(x.grade) : '') + '</span>');
+    if(x.verified){
+      const cl = x.verified === 'graded' ? certLink(x.grade) : null;
+      const inner = (x.verified === 'rook' ? '✓ rook' : x.verified === 'user' ? '✓ yours' : '✓ graded') +
+        (x.verified === 'graded' && x.grade ? ' · ' + esc(x.grade) : '') + (cl ? ' ↗' : '');
+      tags.push(cl
+        ? '<a class="tag verify" href="' + esc(cl.url) + '" target="_blank" rel="noopener noreferrer">' + inner + '</a>'
+        : '<span class="tag verify">' + inner + '</span>');
+    }
     if(x.qty > 1) tags.push('<span class="tag">×' + x.qty + '</span>');
     if(x.cond) tags.push('<span class="tag">' + esc(x.cond) + '</span>');
     if(x.value > 0) tags.push('<span class="tag val">' +
@@ -1139,6 +1172,15 @@ function openRoll(){
   if(it.country) tags.push('<span class="tag">' + esc((flagFor(it.country) ? flagFor(it.country) + ' ' : '') + it.country) + '</span>');
   if(it.mint) tags.push('<span class="tag">mint: ' + esc(it.mint) + '</span>');
   if(it.value > 0) tags.push('<span class="tag val">$' + fmt(it.value) + '</span>');
+  if(it.verified === 'graded'){
+    const rcl = certLink(it.grade);
+    const rinner = '✓ graded' + (it.grade ? ' · ' + esc(it.grade) : '') + (rcl ? ' ↗' : '');
+    tags.push(rcl
+      ? '<a class="tag verify" href="' + esc(rcl.url) + '" target="_blank" rel="noopener noreferrer">' + rinner + '</a>'
+      : '<span class="tag verify">' + rinner + '</span>');
+  } else if(it.verified){
+    tags.push('<span class="tag verify">' + (it.verified === 'rook' ? '✓ rook' : '✓ yours') + '</span>');
+  }
   body.innerHTML = (it.photo ? '<img class="rollphoto" src="' + it.photo + '" alt="">' : '') +
     '<div class="name" style="font-size:18px">' + esc(it.name) + '</div>' +
     '<div class="meta">' + tags.join('') + '</div>' +
@@ -1687,7 +1729,7 @@ if(typeof module !== 'undefined' && module.exports){
     meltValue, worth, recordHistory, sparkPath, SILVER_PRESETS, fmt, qtyOf, mergeItems,
     parseYearRange, yearLabel, normYear, cmpYearAsc, cmpYearDesc, flagFor,
     normalizeSet, normalizeSetEntry, setProgress, originMap, mapXY, rollItem,
-    historyWindow, historyPoint, windowStats,
+    historyWindow, historyPoint, windowStats, certLink,
     encryptSnapshot, decryptSnapshot, sha256Hex
   };
 }
