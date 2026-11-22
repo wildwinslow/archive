@@ -177,6 +177,9 @@
   body.locked #exportBtn, body.locked #importBtn, body.locked #mergeBtn,
   body.locked #shareBtn, body.locked #setAddBtn, body.locked #resetHist { display:none !important; }
   .viewerbanner{background:#241d10; color:#ffcf87; text-align:center; font-size:12px; padding:6px}
+  .histbar{display:flex; gap:8px; margin-top:8px; align-items:center; flex-wrap:wrap}
+  .histbar input{padding:6px 8px; font-size:13px; border-radius:8px; background:var(--panel2);
+    border:1px solid var(--line); color:var(--ink)}
   .spotline{font-family:ui-monospace,Menlo,Consolas,monospace; font-size:11px; color:var(--dim); margin-top:8px}
   .spotline b{color:#ffcf87; font-weight:600}
   .portfolio{margin:12px 16px 0; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px 14px}
@@ -769,6 +772,25 @@ function sparkPath(history, w, h){
   }).join(' ');
 }
 
+/* ---- portfolio time machine (day + range inspection) ---- */
+function historyWindow(history, from, to){
+  return (history || []).filter(p =>
+    (!from || p.d >= from) && (!to || p.d <= to));
+}
+function historyPoint(history, day){
+  return (history || []).find(p => p.d === day) || null;
+}
+function windowStats(sel){
+  const vals = sel.map(p => p.v);
+  const first = vals[0], last = vals[vals.length - 1];
+  return {
+    first, last,
+    delta: Math.round((last - first) * 100) / 100,
+    min: Math.min.apply(null, vals),
+    max: Math.max.apply(null, vals)
+  };
+}
+
 function esc(s){
   return String(s == null ? '' : s).replace(/[&<>"']/g, c => (
     {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]
@@ -787,7 +809,9 @@ let editingList = 'items'; // which array the open modal edits: 'items' | 'wishl
 let pendingPhoto = null;   // dataURL staged in the form
 let activeCat = 'All';
 let spot = null;           // { silver, gold, ts } from live fetch or cache
-let view = 'collection';   // 'collection' | 'wishlist'
+let view = 'collection';   // 'collection' | 'wishlist' | 'sets' | 'map'
+let histFrom = '';         // portfolio window: '' = all time
+let histTo = '';
 
 function activeList(){
   if(view === 'wishlist'){
@@ -850,10 +874,63 @@ function renderPortfolio(){
   const el = $('portfolio');
   const s = stats(state, spot);
   const h = state.history || [];
+  const from = histFrom, to = histTo;
+  const spark = sel => '<svg class="spark" viewBox="0 0 300 56" preserveAspectRatio="none" aria-hidden="true">' +
+    '<path d="' + sparkPath(sel, 300, 56) + '" fill="none" stroke="#e8a33d" stroke-width="2" vector-effect="non-scaling-stroke"/>' +
+    '</svg>';
+  const bar =
+    '<div class="histbar">' +
+      '<input id="histFrom" type="date" value="' + esc(from) + '" aria-label="from date">' +
+      '<input id="histTo" type="date" value="' + esc(to) + '" aria-label="to date">' +
+      '<button class="chip" id="histClear">all time</button>' +
+      '<button class="chip" id="resetHist">reset trend</button>' +
+    '</div>';
+  // single-day inspection
+  if(from && (!to || to === from)){
+    const p = historyPoint(h, from);
+    if(!p){
+      el.innerHTML =
+        '<div class="pf-head"><span>snapshot</span><b>—</b></div>' + bar +
+        '<div class="pf-hint">no snapshot on ' + esc(from) + '</div>';
+      return;
+    }
+    const idx = h.indexOf(p);
+    const prev = idx > 0 ? h[idx - 1] : null;
+    const dd = prev ? Math.round((p.v - prev.v) * 100) / 100 : 0;
+    el.innerHTML =
+      '<div class="pf-head"><span>snapshot · ' + esc(from) + '</span><b>$' + fmt(p.v) + '</b></div>' + bar +
+      (prev
+        ? '<div class="pf-hint">vs ' + esc(prev.d) + ': ' +
+          (dd > 0 ? '▲' : dd < 0 ? '▼' : '·') + ' $' + fmt(Math.abs(dd)) + '</div>'
+        : '<div class="pf-hint">first recorded day</div>');
+    return;
+  }
+  // range inspection
+  if(from && to){
+    const sel = historyWindow(h, from, to);
+    if(!sel.length){
+      el.innerHTML =
+        '<div class="pf-head"><span>' + esc(from) + ' → ' + esc(to) + '</span><b>—</b></div>' + bar +
+        '<div class="pf-hint">no snapshots in that window</div>';
+      return;
+    }
+    const w = windowStats(sel);
+    const cls = w.delta > 0 ? 'up' : w.delta < 0 ? 'down' : '';
+    const arrow = w.delta > 0 ? '▲' : w.delta < 0 ? '▼' : '·';
+    el.innerHTML =
+      '<div class="pf-head"><span>' + esc(from) + ' → ' + esc(to) +
+        ' <span class="pf-delta ' + cls + '">' + arrow + ' $' + fmt(Math.abs(w.delta)) + '</span></span>' +
+        '<b>$' + fmt(w.last) + '</b></div>' + bar +
+      (sel.length >= 2 ? spark(sel)
+        : '<div class="pf-hint">one snapshot in this window: $' + fmt(w.first) + ' on ' + esc(sel[0].d) + '</div>') +
+      '<div class="pf-hint">start $' + fmt(w.first) + ' · low $' + fmt(w.min) + ' · high $' + fmt(w.max) +
+      ' · ' + sel.length + ' snapshot' + (sel.length === 1 ? '' : 's') + '</div>';
+    return;
+  }
+  // all-time (default)
   if(h.length < 2){
     el.innerHTML =
-      '<div class="pf-head"><span>portfolio</span><b>$' + fmt(s.portfolio) + '</b>' +
-      '<button class="chip" id="resetHist">reset trend</button></div>' +
+      '<div class="pf-head"><span>portfolio</span><b>$' + fmt(s.portfolio) + '</b></div>' + bar +
       '<div class="pf-hint">the trend line builds one point per day you open the archive</div>';
     return;
   }
@@ -867,11 +944,8 @@ function renderPortfolio(){
       '<span>portfolio · since ' + d1 + ' <span class="pf-delta ' + cls + '">' +
         arrow + ' $' + fmt(Math.abs(delta)) + '</span></span>' +
       '<b>$' + fmt(last.v) + '</b>' +
-      '<button class="chip" id="resetHist">reset trend</button>' +
-    '</div>' +
-    '<svg class="spark" viewBox="0 0 300 56" preserveAspectRatio="none" aria-hidden="true">' +
-      '<path d="' + sparkPath(h, 300, 56) + '" fill="none" stroke="#e8a33d" stroke-width="2" vector-effect="non-scaling-stroke"/>' +
-    '</svg>';
+    '</div>' + bar +
+    spark(h);
 }
 
 // Daily snapshot: record today's portfolio value, persist only if it changed.
@@ -1415,6 +1489,11 @@ function init(){
   $('viewSets').addEventListener('click', () => setView('sets'));
   $('viewMap').addEventListener('click', () => setView('map'));
   $('portfolio').addEventListener('click', e => {
+    if(e.target.id === 'histClear'){
+      histFrom = ''; histTo = '';
+      renderPortfolio();
+      return;
+    }
     if(e.target.id !== 'resetHist') return;
     if(locked || viewerMode) return;
     if(confirm('Wipe the trend line and start fresh?')){
@@ -1422,6 +1501,15 @@ function init(){
       persist();
       render();
     }
+  });
+  $('portfolio').addEventListener('change', e => {
+    if(e.target.id === 'histFrom') histFrom = e.target.value;
+    else if(e.target.id === 'histTo') histTo = e.target.value;
+    else return;
+    if(histFrom && histTo && histFrom > histTo){
+      const t = histFrom; histFrom = histTo; histTo = t;
+    }
+    renderPortfolio();
   });
   $('rollBtn').addEventListener('click', openRoll);
   $('rollClose').addEventListener('click', () => { $('rollOverlay').hidden = true; });
@@ -1599,6 +1687,7 @@ if(typeof module !== 'undefined' && module.exports){
     meltValue, worth, recordHistory, sparkPath, SILVER_PRESETS, fmt, qtyOf, mergeItems,
     parseYearRange, yearLabel, normYear, cmpYearAsc, cmpYearDesc, flagFor,
     normalizeSet, normalizeSetEntry, setProgress, originMap, mapXY, rollItem,
+    historyWindow, historyPoint, windowStats,
     encryptSnapshot, decryptSnapshot, sha256Hex
   };
 }
