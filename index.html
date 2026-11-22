@@ -320,8 +320,14 @@
             <option value="">unverified</option>
             <option value="rook">Rook-verified</option>
             <option value="user">self-verified</option>
+            <option value="graded">professionally graded</option>
           </select>
         </div>
+      </div>
+
+      <div id="gradeWrap" hidden>
+        <label for="f-grade">Grade / cert (PCGS, NGC…)</label>
+        <input id="f-grade" maxlength="60" placeholder="PCGS MS65 · cert 39284712">
       </div>
 
       <label for="f-value" id="valueLabel">Est. value ($)</label>
@@ -642,7 +648,8 @@ function normalizeItem(it){
     mint: String(it.mint || '').trim().slice(0, 40),
     denom: String(it.denom || '').trim().slice(0, 40),
     paid: Math.max(0, parseFloat(it.paid) || 0),
-    verified: it.verified === 'rook' || it.verified === 'user' ? it.verified : '',
+    verified: it.verified === 'rook' || it.verified === 'user' || it.verified === 'graded' ? it.verified : '',
+    grade: String(it.grade || '').trim().slice(0, 60),
     created: it.created || Date.now(),
     updated: Number(it.updated) || Number(it.created) || Date.now()
   };
@@ -677,7 +684,7 @@ function filterItems(items, query, cat, sort){
     out = out.filter(x => {
       const hay = (x.name + ' ' + x.cat + ' ' + x.cond + ' ' + x.notes + ' ' +
                    yearLabel(x) + ' ' + (x.country || '') + ' ' + (x.mint || '') + ' ' +
-                   (x.denom || '')).toLowerCase();
+                   (x.denom || '') + ' ' + (x.grade || '')).toLowerCase();
       if(hay.includes(q)) return true;
       if(ym && x.yearFrom){
         const qa = parseInt(ym[1], 10), qb = ym[2] ? parseInt(ym[2], 10) : qa;
@@ -917,7 +924,9 @@ function renderGrid(){
     if(x.country) tags.push('<span class="tag">' + esc((flagFor(x.country) ? flagFor(x.country) + ' ' : '') + x.country) + '</span>');
     if(x.mint) tags.push('<span class="tag">mint: ' + esc(x.mint) + '</span>');
     if(x.paid > 0) tags.push('<span class="tag">paid $' + fmt(x.paid) + '</span>');
-    if(x.verified) tags.push('<span class="tag verify">' + (x.verified === 'rook' ? '✓ rook' : '✓ yours') + '</span>');
+    if(x.verified) tags.push('<span class="tag verify">' +
+      (x.verified === 'rook' ? '✓ rook' : x.verified === 'user' ? '✓ yours' : '✓ graded') +
+      (x.verified === 'graded' && x.grade ? ' · ' + esc(x.grade) : '') + '</span>');
     if(x.qty > 1) tags.push('<span class="tag">×' + x.qty + '</span>');
     if(x.cond) tags.push('<span class="tag">' + esc(x.cond) + '</span>');
     if(x.value > 0) tags.push('<span class="tag val">' +
@@ -1193,6 +1202,10 @@ function render(){
 
 // Mint field only matters for coins: show it when category is empty (might be a
 // coin) or mentions coin. One input listener, no surprises on save.
+function updateVerifiedUI(){
+  $('gradeWrap').hidden = $('f-verified').value !== 'graded';
+}
+
 function updateMintUI(){
   const cat = ($('f-cat').value || '').trim();
   const isCoin = (cat === '' || /coin/i.test(cat));
@@ -1282,6 +1295,8 @@ function openModal(item, mode){
   $('f-denom').value = item ? (item.denom || '') : '';
   $('f-paid').value = item && item.paid ? item.paid : '';
   $('f-verified').value = item ? (item.verified || '') : '';
+  $('f-grade').value = item ? (item.grade || '') : '';
+  updateVerifiedUI();
   updateMintUI();
   $('f-name').value = item ? item.name : '';
   $('f-cat').value = item ? item.cat : '';
@@ -1501,6 +1516,7 @@ function init(){
       denom: $('f-denom').value,
       paid: $('f-paid').value,
       verified: $('f-verified').value,
+      grade: $('f-grade').value,
       notes: $('f-notes').value,
       photo: pendingPhoto,
       created: editingId
@@ -1544,6 +1560,7 @@ function init(){
     SILVER_PRESETS.map(p => '<option value="' + p.id + '">' + esc(p.label) + ' · ' + p.oz + ' oz</option>').join('');
   $('f-metal').addEventListener('change', updateMetalUI);
   $('f-cat').addEventListener('input', updateMintUI);
+  $('f-verified').addEventListener('change', updateVerifiedUI);
   $('f-preset').addEventListener('change', () => {
     const p = SILVER_PRESETS.find(x => x.id === $('f-preset').value);
     if(p) $('f-weight').value = p.oz;
