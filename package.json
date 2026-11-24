@@ -1,0 +1,16 @@
+{
+  "name": "collection-archive",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local-first collection archive PWA (the deployed shell IS the app)",
+  "scripts": {
+    "test": "node tests/core.test.js",
+    "test:e2e": "node tests/e2e.js",
+    "test:live": "node tests/e2e-live.js",
+    "icons": "node tests/gen-icons.js"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.49.0",
+    "pngjs": "^7.0.0"
+  }
+}

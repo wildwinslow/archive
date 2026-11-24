@@ -1,0 +1,23 @@
+{
+  "items": [],
+  "wishlist": [
+    {
+      "id": "rook-wish-fixture",
+      "name": "Test wanted CRT",
+      "cat": "Weird Objects",
+      "qty": 1,
+      "cond": "",
+      "date": "",
+      "value": 25,
+      "metal": "",
+      "fineWt": 0,
+      "yearFrom": 1990,
+      "yearTo": 1990,
+      "notes": "wishlist merge fixture entry",
+      "photo": null,
+      "created": 1700000000000,
+      "updated": 1700000000000
+    }
+  ],
+  "cats": ["Weird Objects"]
+}

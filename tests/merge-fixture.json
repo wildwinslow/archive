@@ -1,0 +1,20 @@
+{
+  "items": [
+    {
+      "id": "rooktest001",
+      "name": "Rook test Mercury dime",
+      "cat": "Coins",
+      "qty": 1,
+      "cond": "Fine",
+      "date": "",
+      "value": 0,
+      "metal": "silver",
+      "fineWt": 0.07234,
+      "notes": "merge-flow fixture entry",
+      "photo": null,
+      "created": 1700000000000,
+      "updated": 1700000000000
+    }
+  ],
+  "cats": ["Coins"]
+}
