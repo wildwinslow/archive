@@ -47,14 +47,12 @@ function makeIcon(size, { maskable }){
     }
   }
 
-  // stamp the W as 4 vector strokes (true diagonals, smooth AA via supersample)
-  const pts = [
-    [-0.46, -0.52],  // top-left
-    [-0.20,  0.55],  // bottom-left point
-    [ 0.00, -0.15],  // middle peak
-    [ 0.20,  0.55],  // bottom-right point
-    [ 0.46, -0.52]   // top-right
-  ].map(([ux, uy]) => [cx + ux * radius, cy + uy * radius]);
+  // stamp the N as 3 vector strokes (mintmark style — one letter, like coins do)
+  const polys = [
+    [[-0.38, -0.55], [-0.38, 0.55]],   // left stem
+    [[-0.38, -0.55], [ 0.38, 0.55]],   // diagonal
+    [[ 0.38, -0.55], [ 0.38, 0.55]]    // right stem
+  ].map(poly => poly.map(([ux, uy]) => [cx + ux * radius, cy + uy * radius]));
   const halfW = 0.13 * radius;
 
   function distToSeg(px, py, ax, ay, bx, by){
@@ -73,8 +71,11 @@ function makeIcon(size, { maskable }){
   for(let y = y0; y <= y1; y++){
     for(let x = x0; x <= x1; x++){
       let d = Infinity;
-      for(let s = 0; s < pts.length - 1; s++){
-        d = Math.min(d, distToSeg(x, y, pts[s][0], pts[s][1], pts[s+1][0], pts[s+1][1]));
+      for(const poly of polys){
+        for(let s = 0; s < poly.length - 1; s++){
+          d = Math.min(d, distToSeg(x, y, poly[s][0], poly[s][1], poly[s+1][0], poly[s+1][1]));
+          if(d <= halfW) break;
+        }
         if(d <= halfW) break;
       }
       if(d <= halfW){
