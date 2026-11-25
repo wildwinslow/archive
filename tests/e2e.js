@@ -1,4 +1,4 @@
-/* End-to-end test: drives the Collection Archive in real Chromium. */
+/* End-to-end test: drives The Numismatist's Archive in real Chromium. */
 const { chromium } = require('playwright-core');
 const http = require('http');
 const fs = require('fs');
@@ -64,7 +64,7 @@ function ok(cond, label){
 
   console.log('== load & shell ==');
   await page.goto('http://127.0.0.1:' + PORT + '/index.html', { waitUntil: 'networkidle' });
-  ok((await page.title()).includes('Collection Archive'), 'page title');
+  ok((await page.title()).includes('Numismatist'), 'page title: ' + (await page.title()));
   ok(await page.isVisible('#fab'), 'FAB visible');
   ok((await page.locator('.empty').count()) === 1, 'empty state shown');
   ok((await page.locator('link[rel=manifest]').count()) === 1, 'manifest linked');
@@ -544,7 +544,7 @@ function ok(cond, label){
   await page.waitForTimeout(400);
   const offlineCards = await page.locator('.card').count();
   const offlineTitle = await page.title();
-  ok(offlineTitle.includes('Collection Archive'), 'offline: page serves from cache');
+  ok(offlineTitle.includes('Numismatist'), 'offline: page serves from cache');
   ok(offlineCards === cardsBeforeOffline,
      'offline: all ' + cardsBeforeOffline + ' cards render from cache, got ' + offlineCards);
   await ctx.setOffline(false);

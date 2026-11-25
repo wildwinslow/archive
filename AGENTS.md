@@ -1,4 +1,4 @@
-# AGENTS.md — Collection Archive
+# AGENTS.md — The Numismatist's Archive
 
 Use when maintaining or extending this app. It is a **deployed production PWA** whose
 owner uses it daily: every commit to `main` is a live release. Update in small verified

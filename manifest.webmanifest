@@ -1,6 +1,6 @@
 {
-  "name": "Winslow's Collection Archive",
-  "short_name": "The Archive",
+  "name": "The Numismatist's Archive",
+  "short_name": "N. Archive",
   "description": "Log and record the hoard: coins, militaria, games, weird objects.",
   "start_url": "./index.html",
   "scope": "./",

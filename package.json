@@ -1,5 +1,5 @@
 {
-  "name": "collection-archive",
+  "name": "numismatists-archive",
   "version": "1.0.0",
   "private": true,
   "description": "Local-first collection archive PWA (the deployed shell IS the app)",

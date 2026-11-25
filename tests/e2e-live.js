@@ -31,7 +31,7 @@ function ok(cond, label){
 
   console.log('== live load ==');
   await page.goto(URL, { waitUntil: 'networkidle', timeout: 60000 });
-  ok((await page.title()).includes('Collection Archive'), 'live title: ' + (await page.title()));
+  ok((await page.title()).includes('Numismatist'), 'live title: ' + (await page.title()));
   ok(await page.isVisible('#fab'), 'FAB visible on live site');
   const mf = await page.evaluate(async () => {
     const r = await fetch('manifest.webmanifest');
@@ -155,7 +155,7 @@ function ok(cond, label){
   await ctx.setOffline(true);
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(600);
-  ok((await page.title()).includes('Collection Archive'), 'offline: shell from cache');
+  ok((await page.title()).includes('Numismatist'), 'offline: shell from cache');
   const offlineCards = await page.locator('.card').count();
   ok(offlineCards === cardsBeforeOffline,
      'offline: all ' + cardsBeforeOffline + ' cards render from cache, got ' + offlineCards);

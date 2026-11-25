@@ -1,10 +1,14 @@
-# 📦 The Collection Archive
+# 🪙 The Numismatist's Archive
 
 **Live app → [wildwinslow.github.io/archive](https://wildwinslow.github.io/archive/)**
 
-A local-first archive for logging and valuing a personal collection — coins, militaria,
-games, weird objects, whatever fits in a drawer and a story. Built for one collector,
-designed so the collection never becomes someone else's data.
+A local-first archive for logging and valuing a **coin collection** — built around the
+numismatic workflow: mint, denomination, grade, cert, melt, provenance. Designed so the
+collection never becomes someone else's data.
+
+> **Versioning note:** this iteration is numismatics-first and says so on the tin.
+> Wider collections (militaria, games, the weird stuff) arrive in *sibling* versions
+> with their own names — the cross-category wedge is sequenced, not abandoned.
 
 > **The core idea:** there is no backend database. Your collection lives in *your*
 > browser; the server only hosts an empty app shell and one encrypted vault it cannot
