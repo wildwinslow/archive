@@ -196,7 +196,7 @@
   }
   @media (min-width:1024px){
     .board{display:grid; grid-template-columns:1.12fr 1fr; gap:16px; align-items:start;
-      grid-template-areas:"items portfolio" "map sets";}
+      grid-template-areas:"items portfolio" "map sets"; padding:0 16px;}
     .cellItems{grid-area:items}
     #portfolio{grid-area:portfolio; margin:0}
     #panelMap{grid-area:map}
@@ -917,7 +917,7 @@ function renderStats(){
         fmt(Math.abs(s.portfolio - s.paid)) + '</b><span>' +
         (s.portfolio - s.paid >= 0 ? 'gain vs paid' : 'underwater vs paid') + '</span></div>'
       : '') +
-    '<div><b>' + state.cats.length + '</b><span>categories</span></div>';
+    '<div><b>' + state.cats.length + '</b><span>' + (state.cats.length === 1 ? 'category' : 'categories') + '</span></div>';
 }
 
 function renderSpot(){
@@ -937,7 +937,7 @@ function renderPortfolio(){
   const s = stats(state, spot);
   const h = state.history || [];
   const from = histFrom, to = histTo;
-  const spark = sel => '<svg class="spark" viewBox="0 0 300 56" preserveAspectRatio="none" aria-hidden="true">' +
+  const spark = sel => '<svg class="spark" viewBox="-2 0 304 56" preserveAspectRatio="none" aria-hidden="true">' +
     '<path d="' + sparkPath(sel, 300, 56) + '" fill="none" stroke="#e8a33d" stroke-width="2" vector-effect="non-scaling-stroke"/>' +
     '</svg>';
   const bar =
@@ -1095,7 +1095,7 @@ function renderMapView(grid){
   }
   const w = 600, h = 300;
   let svg = '<svg viewBox="0 0 600 300" aria-hidden="true">';
-  for(let lng = -120; lng <= 120; lng += 60){
+  for(let lng = -180; lng <= 180; lng += 60){
     const x = ((lng + 180) / 360) * w;
     svg += '<line x1="' + x + '" y1="0" x2="' + x + '" y2="' + h + '" stroke="#33332a"/>';
   }
