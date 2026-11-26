@@ -182,7 +182,7 @@
 
   /* ---- mirror board: 4 screens on big displays, same single column on phones ---- */
   #panelMap, #panelSets{display:none}
-  @media (max-width:1023px){
+  @media (max-width:899px){
     /* phone view switching: swap the LIST out, keep the viewbar reachable
        (hiding .cellItems here once hid the switcher itself — trapped in map view) */
     body[data-view="map"] .toolbar,
@@ -194,7 +194,7 @@
     body[data-view="sets"] #grid{display:none}
     body[data-view="sets"] #panelSets{display:block}
   }
-  @media (min-width:1024px){
+  @media (min-width:900px){
     .board{display:grid; grid-template-columns:1.12fr 1fr; gap:16px; align-items:start;
       grid-template-areas:"items portfolio" "map sets"; padding:0 16px;}
     .cellItems{grid-area:items}

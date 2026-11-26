@@ -542,7 +542,15 @@ function ok(cond, label){
   ok((await page.locator('#panelSets .setcard, #panelSets .empty').count()) > 0, 'board: sets panel rendered');
   const boardGrid = await page.evaluate(() => getComputedStyle(document.querySelector('.board')).display);
   ok(boardGrid === 'grid', 'board: CSS grid active at laptop width, got ' + boardGrid);
-  // and the phone column survives a trip back
+  // landscape phone (S25 class, ~915x412 CSS): the board must wake up here too
+  await page.setViewportSize({ width: 915, height: 412 });
+  await page.waitForTimeout(250);
+  const landGrid = await page.evaluate(() => getComputedStyle(document.querySelector('.board')).display);
+  ok(landGrid === 'grid', 'board activates in phone landscape (915px), got ' + landGrid);
+  ok(await vis('.cellItems') && await vis('#portfolio') && await vis('#panelMap') && await vis('#panelSets'),
+     'landscape: all four screens visible on the phone');
+
+  // and the phone column survives a trip back to portrait
   await page.setViewportSize({ width: 412, height: 915 });
   await page.waitForTimeout(300);
   ok((await page.locator('.board').count()) === 1, 'board: structure intact at phone width');
