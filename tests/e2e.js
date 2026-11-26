@@ -549,6 +549,9 @@ function ok(cond, label){
   ok(landGrid === 'grid', 'board activates in phone landscape (915px), got ' + landGrid);
   ok(await vis('.cellItems') && await vis('#portfolio') && await vis('#panelMap') && await vis('#panelSets'),
      'landscape: all four screens visible on the phone');
+  const landBox = await page.locator('.board').boundingBox();
+  ok(landBox && (landBox.y + landBox.height) <= 412 + 8,
+     'landscape: all four screens fit ON screen (board bottom ' + Math.round((landBox ? landBox.y + landBox.height : 0)) + ' <= 420)');
 
   // and the phone column survives a trip back to portrait
   await page.setViewportSize({ width: 412, height: 915 });
