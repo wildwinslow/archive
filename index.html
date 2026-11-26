@@ -1096,7 +1096,7 @@ function renderSetsView(grid){
   const sets = state.sets || [];
   const addBtn = '<button id="setAddBtn" class="big save" style="width:100%; margin-bottom:12px">+ new set</button>';
   if(!sets.length){
-    grid.innerHTML = addBtn + '<div class="empty"><b>NO SETS YET</b>Define a set — Mercury dimes 1916-1945 — and the archive starts tracking the gaps.</div>';
+    grid.innerHTML = addBtn + '<div class="empty"><b>NO SETS YET</b>Define a set, list its entries, and the archive starts tracking the gaps.</div>';
     return;
   }
   grid.innerHTML = addBtn + sets.map(s => {
