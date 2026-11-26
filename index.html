@@ -244,12 +244,12 @@
     <h2 id="modalTitle">Log an item</h2>
     <form id="form">
       <label for="f-name">Name *</label>
-      <input id="f-name" required maxlength="140" placeholder="1944 jeep first-aid kit">
+      <input id="f-name" required maxlength="140">
 
       <div class="row">
         <div>
           <label for="f-cat">Category</label>
-          <input id="f-cat" list="catList" maxlength="40" placeholder="World War II">
+          <input id="f-cat" list="catList" maxlength="40">
           <datalist id="catList"></datalist>
         </div>
         <div id="qtyWrap">
@@ -261,7 +261,7 @@
       <div class="row" id="condDateRow">
         <div>
           <label for="f-cond">Condition</label>
-          <input id="f-cond" list="condList" maxlength="30" placeholder="Good">
+          <input id="f-cond" list="condList" maxlength="30">
           <datalist id="condList">
             <option>Poor</option><option>Fair</option><option>Good</option>
             <option>Very Good</option><option>Excellent</option><option>Mint</option><option>Sealed</option>
@@ -274,12 +274,12 @@
       </div>
 
       <label for="f-year">Year / release date</label>
-      <input id="f-year" maxlength="24" placeholder="1920 or 1915-1925" autocomplete="off">
+      <input id="f-year" maxlength="24" autocomplete="off">
 
       <div class="row">
         <div>
           <label for="f-country">Country of origin</label>
-          <input id="f-country" list="countryList" maxlength="40" placeholder="Poland">
+          <input id="f-country" list="countryList" maxlength="40">
           <datalist id="countryList">
             <option>United States</option><option>Poland</option><option>Germany</option>
             <option>Japan</option><option>Sweden</option><option>Italy</option>
@@ -291,7 +291,7 @@
         </div>
         <div id="mintWrap">
           <label for="f-mint">Mint (coins)</label>
-          <input id="f-mint" list="mintList" maxlength="40" placeholder="Aachen">
+          <input id="f-mint" list="mintList" maxlength="40">
           <datalist id="mintList">
             <option>Aachen</option><option>Berlin</option><option>Paris</option>
             <option>London</option><option>Vienna</option><option>Warsaw</option>
@@ -303,7 +303,7 @@
 
       <div id="denomWrap">
         <label for="f-denom">Denomination (coins)</label>
-        <input id="f-denom" list="denomList" maxlength="40" placeholder="10 fenigów">
+        <input id="f-denom" list="denomList" maxlength="40">
         <datalist id="denomList">
           <option>1 cent</option><option>5 cents</option><option>10 cents</option>
           <option>25 cents (quarter)</option><option>50 cents</option><option>1 dollar</option>
@@ -317,7 +317,7 @@
       <div class="row" id="paidWrap">
         <div>
           <label for="f-paid">What I paid ($)</label>
-          <input id="f-paid" type="number" min="0" step="0.01" placeholder="0.00">
+          <input id="f-paid" type="number" min="0" step="0.01">
         </div>
         <div>
           <label for="f-verified">Verification</label>
@@ -332,11 +332,11 @@
 
       <div id="gradeWrap" hidden>
         <label for="f-grade">Grade / cert (PCGS, NGC…)</label>
-        <input id="f-grade" maxlength="60" placeholder="PCGS MS65 · cert 39284712">
+        <input id="f-grade" maxlength="60">
       </div>
 
       <label for="f-value" id="valueLabel">Est. value ($)</label>
-      <input id="f-value" type="number" min="0" step="0.01" placeholder="0.00">
+      <input id="f-value" type="number" min="0" step="0.01">
 
       <div id="meltWrap">
       <label for="f-metal">Live melt value (optional)</label>
@@ -355,13 +355,13 @@
       <div class="row" id="f-wtWrap" hidden>
         <div>
           <label for="f-weight">Fine weight (troy oz of pure metal)</label>
-          <input id="f-weight" type="number" min="0" step="any" placeholder="0.0723">
+          <input id="f-weight" type="number" min="0" step="any">
         </div>
       </div>
       </div>
 
       <label for="f-notes">Notes / provenance</label>
-      <textarea id="f-notes" maxlength="2000" placeholder="where it came from, the story, the seller's suspicious wording…"></textarea>
+      <textarea id="f-notes" maxlength="2000"></textarea>
 
       <label for="f-photo">Photo</label>
       <input id="f-photo" type="file" accept="image/*">
@@ -393,11 +393,11 @@
     <h2 id="setModalTitle">New set</h2>
     <form id="setForm">
       <label for="s-name">Set name</label>
-      <input id="s-name" maxlength="80" placeholder="Mercury dimes 1916-1945" required>
+      <input id="s-name" maxlength="80" required>
       <label for="s-desc">Description</label>
-      <input id="s-desc" maxlength="200" placeholder="date set, one per year">
+      <input id="s-desc" maxlength="200">
       <label for="s-entries">Entries (one per line: label | year)</label>
-      <textarea id="s-entries" style="min-height:160px" placeholder="1916-D | 1916&#10;1916-S | 1916&#10;1921 | 1921"></textarea>
+      <textarea id="s-entries" style="min-height:160px"></textarea>
       <div class="btns">
         <button type="button" class="big cancel" id="setCancel">Cancel</button>
         <button type="submit" class="big save">Save set</button>
