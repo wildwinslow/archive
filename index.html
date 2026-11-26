@@ -179,6 +179,32 @@
   body.locked #exportBtn, body.locked #importBtn, body.locked #mergeBtn,
   body.locked #shareBtn, body.locked #setAddBtn, body.locked #resetHist { display:none !important; }
   .viewerbanner{background:#241d10; color:#ffcf87; text-align:center; font-size:12px; padding:6px}
+
+  /* ---- mirror board: 4 screens on big displays, same single column on phones ---- */
+  #panelMap, #panelSets{display:none}
+  @media (max-width:1023px){
+    /* phone view switching: swap the LIST out, keep the viewbar reachable
+       (hiding .cellItems here once hid the switcher itself — trapped in map view) */
+    body[data-view="map"] .toolbar,
+    body[data-view="map"] .chips,
+    body[data-view="map"] #grid{display:none}
+    body[data-view="map"] #panelMap{display:block}
+    body[data-view="sets"] .toolbar,
+    body[data-view="sets"] .chips,
+    body[data-view="sets"] #grid{display:none}
+    body[data-view="sets"] #panelSets{display:block}
+  }
+  @media (min-width:1024px){
+    .board{display:grid; grid-template-columns:1.12fr 1fr; gap:16px; align-items:start;
+      grid-template-areas:"items portfolio" "map sets";}
+    .cellItems{grid-area:items}
+    #portfolio{grid-area:portfolio; margin:0}
+    #panelMap{grid-area:map}
+    #panelSets{grid-area:sets}
+    .cellItems, #panelMap, #panelSets{display:block !important}
+    #viewSets, #viewMap{display:none}   /* everything is already on screen */
+    .board .portfolio{height:100%}
+  }
   .histbar{display:flex; gap:8px; margin-top:8px; align-items:center; flex-wrap:wrap}
   .histbar input{padding:6px 8px; font-size:13px; border-radius:8px; background:var(--panel2);
     border:1px solid var(--line); color:var(--ink)}
@@ -201,7 +227,10 @@
   <div class="spotline" id="spotline"></div>
 </header>
 
+<div class="board">
 <div class="portfolio" id="portfolio"></div>
+
+<div class="cellItems">
 
 <div class="toolbar">
   <input id="search" type="search" placeholder="search the hoard…" autocomplete="off">
@@ -224,6 +253,11 @@
 
 <div class="chips" id="chips"></div>
 <main id="grid"></main>
+</div><!-- /cellItems -->
+
+<div class="panelbox" id="panelMap"></div>
+<div class="panelbox" id="panelSets"></div>
+</div><!-- /board -->
 
 <div class="foot">
   <button id="rollBtn">🎲 roll</button>
@@ -987,7 +1021,6 @@ function snapshotToday(){
 }
 
 function renderChips(){
-  if(view === 'sets' || view === 'map'){ $('chips').innerHTML = ''; return; }
   const list = activeList();
   const counts = {};
   list.forEach(x => { counts[x.cat] = (counts[x.cat]||0) + 1; });
@@ -1000,8 +1033,6 @@ function renderChips(){
 }
 
 function renderGrid(){
-  if(view === 'map'){ renderMapView($('grid')); return; }
-  if(view === 'sets'){ renderSetsView($('grid')); return; }
   const list = activeList();
   const rows = filterItems(list, $('search').value, activeCat, $('sort').value);
   const grid = $('grid');
@@ -1306,12 +1337,15 @@ function renderViewbar(){
 }
 
 function render(){
+  document.body.dataset.view = view;
   renderViewbar();
   renderStats();
   renderSpot();
   renderPortfolio();
   renderChips();
   renderGrid();
+  renderMapView($('panelMap'));
+  renderSetsView($('panelSets'));
   $('catList').innerHTML = state.cats.map(c => '<option value="' + esc(c) + '">').join('');
   snapshotToday();
 }
@@ -1579,7 +1613,7 @@ function init(){
     renderGrid();
   });
 
-  $('grid').addEventListener('click', e => {
+  document.addEventListener('click', e => {
     const sc = e.target.closest('[data-setcheck]');
     if(sc && !locked && !viewerMode){
       const ids = sc.dataset.setcheck.split('|');

@@ -45,7 +45,7 @@ function ok(cond, label){
   await page.click('#fab');
   await page.fill('#f-name', 'live site smoke test coin');
   await page.fill('#f-cat', 'Coins');
-  await page.click('button.save');
+  await page.click('#form button.save');
   await page.waitForTimeout(200);
   ok((await page.locator('.card').count()) === 1, 'item added on live site');
   await page.reload({ waitUntil: 'networkidle' });
@@ -83,7 +83,7 @@ function ok(cond, label){
   await page.fill('#f-country', 'Sweden');
   await page.fill('#f-mint', 'Aachen');
   await page.fill('#f-denom', '1 krona');
-  await page.click('button.save');
+  await page.click('#form button.save');
   await page.waitForTimeout(250);
   const smokeCard = page.locator('.card', { hasText: 'live year smoke test' });
   const yTag = await smokeCard.locator('.tag.year').innerText().catch(() => '');
@@ -94,7 +94,7 @@ function ok(cond, label){
   ok(await page.evaluate(() => !!document.querySelector('#f-verified option[value=graded]')), 'graded tier option live');
   await page.click('#viewWishlist');
   await page.waitForTimeout(150);
-  ok(await page.locator('.empty b').innerText() === 'WISHLIST EMPTY' || (await page.locator('.card').count()) >= 0,
+  ok(await page.locator('#grid .empty b').innerText().catch(() => '') === 'WISHLIST EMPTY' || (await page.locator('.card').count()) >= 0,
      'wishlist view switches on live site');
   await page.click('#viewCollection');
   await page.waitForTimeout(150);
@@ -116,11 +116,11 @@ function ok(cond, label){
   await page.click('#fab');
   await page.fill('#f-name', 'map smoke pin');
   await page.fill('#f-country', 'Japan');
-  await page.click('button.save');
+  await page.click('#form button.save');
   await page.waitForTimeout(250);
   await page.click('#viewMap');
   await page.waitForTimeout(150);
-  const liveMap = await page.locator('#grid').innerHTML();
+  const liveMap = await page.locator('#panelMap').innerHTML();
   ok(liveMap.includes('<svg'), 'map view renders live');
   ok(liveMap.includes('Japan'), 'map shows Japan pin live');
   await page.click('#viewCollection');

@@ -66,7 +66,7 @@ function ok(cond, label){
   await page.goto('http://127.0.0.1:' + PORT + '/index.html', { waitUntil: 'networkidle' });
   ok((await page.title()).includes('Numismatist'), 'page title: ' + (await page.title()));
   ok(await page.isVisible('#fab'), 'FAB visible');
-  ok((await page.locator('.empty').count()) === 1, 'empty state shown');
+  ok((await page.locator('#grid .empty').count()) === 1, 'empty state shown in items cell');
   ok((await page.locator('link[rel=manifest]').count()) === 1, 'manifest linked');
   const mf = await page.evaluate(async () => {
     const r = await fetch('manifest.webmanifest');
@@ -92,7 +92,7 @@ function ok(cond, label){
   await page.fill('#f-cond', 'Good');
   await page.fill('#f-value', '45.50');
   await page.fill('#f-notes', 'seller said "museum quality" (suspicious)');
-  await page.click('button.save');
+  await page.click('#form button.save');
   await page.waitForTimeout(150);
   ok((await page.locator('.card').count()) === 1, 'card appears after save');
   const cardText = await page.locator('.card').innerText();
@@ -107,7 +107,7 @@ function ok(cond, label){
   await page.fill('#f-name', 'Mercury dime');
   await page.fill('#f-cat', 'Coins');
   await page.fill('#f-qty', '3');
-  await page.click('button.save');
+  await page.click('#form button.save');
   await page.waitForTimeout(150);
   ok((await page.locator('.card').count()) === 2, 'two cards');
   await page.fill('#search', 'mercury');
@@ -128,7 +128,7 @@ function ok(cond, label){
   await page.waitForTimeout(150);
   ok((await page.inputValue('#f-name')).includes('jeep'), 'edit form prefilled with jeep item');
   await page.fill('#f-value', '60');
-  await page.click('button.save');
+  await page.click('#form button.save');
   await page.waitForTimeout(150);
   ok((await page.locator('.card').count()) === 2, 'edit does not duplicate');
   const stats2 = await page.locator('#stats').innerText();
@@ -162,7 +162,7 @@ function ok(cond, label){
   ok(wt === '0.07234', 'preset fills fine weight, got ' + wt);
   await page.fill('#f-name', 'Mercury dime');
   await page.fill('#f-cat', 'Coins');
-  await page.click('button.save');
+  await page.click('#form button.save');
   await page.waitForTimeout(250);
   const meltTags = await page.locator('.tag.melt').allInnerTexts();
   const spotNow = await page.locator('#spotline').innerText();
@@ -207,7 +207,7 @@ function ok(cond, label){
   await page.fill('#f-name', 'NES front-loader');
   await page.fill('#f-cat', 'Games & Consoles');
   await page.fill('#f-year', '1985');
-  await page.click('button.save');
+  await page.click('#form button.save');
   await page.waitForTimeout(200);
   ok(await page.locator('.card', { hasText: 'NES front-loader' }).locator('.tag.year', { hasText: '1985' }).count() === 1,
      'single-year tag renders on card');
@@ -215,7 +215,7 @@ function ok(cond, label){
   await page.fill('#f-name', 'Pocket watch');
   await page.fill('#f-cat', 'Weird Objects');
   await page.fill('#f-year', '1915-1925');
-  await page.click('button.save');
+  await page.click('#form button.save');
   await page.waitForTimeout(200);
   const watchTag = await page.locator('.card', { hasText: 'Pocket watch' }).locator('.tag.year').innerText();
   ok(watchTag.includes('1915') && watchTag.includes('1925'), 'range year tag renders: ' + watchTag);
@@ -245,7 +245,7 @@ function ok(cond, label){
   console.log('== wishlist view ==');
   await page.click('#viewWishlist');
   await page.waitForTimeout(150);
-  ok((await page.locator('.empty b').innerText()) === 'WISHLIST EMPTY', 'wishlist empty state');
+  ok((await page.locator('#grid .empty b').innerText()) === 'WISHLIST EMPTY', 'wishlist empty state');
   await page.click('#fab');
   // textContent, not innerText: CSS text-transform:uppercase makes innerText shout back
   ok((await page.locator('#modalTitle').textContent()) === 'Add to wishlist', 'modal opens in wishlist mode');
@@ -256,7 +256,7 @@ function ok(cond, label){
   await page.fill('#f-cat', 'Pokémon');
   await page.fill('#f-year', '2017');
   await page.fill('#f-value', '500');
-  await page.click('button.save');
+  await page.click('#form button.save');
   await page.waitForTimeout(200);
   const wantCard = page.locator('.card', { hasText: 'GoFest Lugia' });
   ok(await wantCard.count() === 1, 'want card renders');
@@ -306,7 +306,7 @@ function ok(cond, label){
   await page.fill('#f-country', 'Poland');
   await page.fill('#f-mint', 'Aachen');
   await page.fill('#f-denom', '10 fenigów');
-  await page.click('button.save');
+  await page.click('#form button.save');
   await page.waitForTimeout(200);
   const coinCard = page.locator('.card', { hasText: 'Notgeld test piece' });
   ok(await coinCard.count() === 1, 'coin card renders');
@@ -340,7 +340,7 @@ function ok(cond, label){
   await page.fill('#f-paid', '20');
   await page.selectOption('#f-verified', 'user');
   await page.fill('#f-value', '35');
-  await page.click('button.save');
+  await page.click('#form button.save');
   await page.waitForTimeout(250);
   const pinCard = page.locator('.card', { hasText: 'Cost test pin' });
   const pinText = await pinCard.innerText();
@@ -360,7 +360,7 @@ function ok(cond, label){
   await page.selectOption('#f-verified', 'graded');
   await page.fill('#f-name', 'Graded test coin');
   await page.fill('#f-cat', 'Coins');
-  await page.click('button.save');
+  await page.click('#form button.save');
   await page.waitForTimeout(250);
   const gradedCard = page.locator('.card', { hasText: 'Graded test coin' });
   const gradedText = await gradedCard.innerText();
@@ -439,7 +439,7 @@ function ok(cond, label){
   console.log('== sets ==');
   await page.click('#viewSets');
   await page.waitForTimeout(150);
-  ok((await page.locator('.empty b').innerText()) === 'NO SETS YET', 'sets empty state');
+  ok((await page.locator('#panelSets .empty b').innerText()) === 'NO SETS YET', 'sets empty state');
   await page.click('#setAddBtn');
   await page.fill('#s-name', 'Test date set');
   await page.fill('#s-desc', 'three entries');
@@ -462,7 +462,7 @@ function ok(cond, label){
   console.log('== map ==');
   await page.click('#viewMap');
   await page.waitForTimeout(150);
-  const mapHtml = await page.locator('#grid').innerHTML();
+  const mapHtml = await page.locator('#panelMap').innerHTML();
   ok(mapHtml.includes('<svg'), 'map renders svg');
   ok(mapHtml.includes('Poland') || mapHtml.includes('poland') || mapHtml.includes('🇵🇱'), 'map shows the Poland pin');
   ok(mapHtml.includes('Militaria') || mapHtml.includes('x1'), 'map legend shows item counts');
@@ -526,6 +526,29 @@ function ok(cond, label){
   await viewerCtx.close();
   if(SHARE_BACKUP) fs.writeFileSync(SHARE, SHARE_BACKUP); else fs.unlinkSync(SHARE);
 
+  console.log('== mirror board (4 screens) ==');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.click('#viewCollection');
+  await page.waitForTimeout(300);
+  const vis = sel => page.locator(sel).isVisible();
+  ok(await vis('.cellItems'), 'board: items cell visible at 1440px');
+  ok(await vis('#portfolio'), 'board: portfolio cell visible');
+  ok(await vis('#panelMap'), 'board: map cell visible');
+  ok(await vis('#panelSets'), 'board: sets cell visible');
+  ok(await vis('#viewCollection') && await vis('#viewWishlist'), 'board: list toggle stays usable');
+  ok(!(await vis('#viewSets')) && !(await vis('#viewMap')), 'board: sets/map toggles hidden (already on screen)');
+  ok((await page.locator('.card').count()) > 0, 'board: items list populated');
+  ok((await page.locator('#portfolio svg.spark, #portfolio .pf-hint').count()) > 0, 'board: portfolio rendered');
+  ok((await page.locator('#panelSets .setcard, #panelSets .empty').count()) > 0, 'board: sets panel rendered');
+  const boardGrid = await page.evaluate(() => getComputedStyle(document.querySelector('.board')).display);
+  ok(boardGrid === 'grid', 'board: CSS grid active at laptop width, got ' + boardGrid);
+  // and the phone column survives a trip back
+  await page.setViewportSize({ width: 412, height: 915 });
+  await page.waitForTimeout(300);
+  ok((await page.locator('.board').count()) === 1, 'board: structure intact at phone width');
+  ok(!(await vis('#panelMap')), 'phone: companion map panel hidden again');
+  await page.setViewportSize({ width: 1440, height: 900 });
+
   console.log('== service worker ==');
   const swState = await page.evaluate(async () => {
     const reg = await navigator.serviceWorker.ready;
@@ -553,7 +576,7 @@ function ok(cond, label){
   await page.reload({ waitUntil: 'networkidle' });
   await page.click('#fab');
   await page.fill('#f-name', '<img src=x onerror=alert(1)>');
-  await page.click('button.save');
+  await page.click('#form button.save');
   await page.waitForTimeout(150);
   const injected = await page.evaluate(() => document.querySelectorAll('.card img').length);
   ok(injected === 0, 'HTML in name is escaped, not executed');
