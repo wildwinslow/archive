@@ -828,7 +828,7 @@ function sparkPath(history, w, h){
   const max = Math.max.apply(null, vs);
   const range = (max - min) || 1;   // flat line still renders
   return history.map((p, i) => {
-    const x = (i / (history.length - 1)) * w;
+    const x = 2 + (i / (history.length - 1)) * (w - 4);
     const y = h - ((p.v - min) / range) * (h - 4) - 2;   // 2px breathing room
     return (i ? 'L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1);
   }).join(' ');
